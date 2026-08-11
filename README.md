@@ -43,9 +43,11 @@ The current version of SEIRify provides users with the opportunity to model thre
 -	Susceptible (S) – Infectious (I): SI Model
 In SI models, individuals who become infected remain infectious for life, as infection does not confer immunity. Thus, people never leave the infectious state. This structure is suitable for modeling lifelong infections such as HIV or herpes virus. The key parameter is the transmission rate (β), which represents the probability of disease transmission between a susceptible and an infectious individual per contact per unit time.
 <img width="446" height="152" alt="image" src="https://github.com/user-attachments/assets/fb9a9e40-04bc-41ad-9325-96467302c47f" />
+
 -	Susceptible (S) – Infectious (I) – Recovered (R): SIR Model
 In SIR models, infected individuals eventually recover and move into the recovered class, where they are assumed to be immune. The two main parameters are the transmission rate (β) and the recovery rate (α), with α defined as the reciprocal of the mean infectious period (1/mean infectious period).
 <img width="577" height="133" alt="image" src="https://github.com/user-attachments/assets/7b7cd445-8074-4952-9e22-7ec31cce8377" />
+
 -	Susceptible (S) – Exposed (E) – Infectious (I) – Recovered (R): SEIR Model
 The SEIR model adds an exposed class to capture the incubation period during which individuals are infected but not yet infectious. This model is widely used for acute infectious diseases with a latent stage. Parameters required for this model include the transmission rate (β), the progression rate (k) from exposed to infectious (defined as the reciprocal of the incubation period, 1/incubation period), and the recovery rate (α) (1/mean infectious period).
 
