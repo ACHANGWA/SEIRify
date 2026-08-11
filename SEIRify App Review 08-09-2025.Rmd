@@ -1,0 +1,3151 @@
+---
+title: "SEIRify"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    source_code: embed
+    navbar:
+      - { icon: "fa fa-rss", href: "http://onehealth.or.kr/  ", align: right }
+    vertical_layout: fill
+    theme: 
+      version: 4    
+      fg: "#19191a"
+      bg: "#FBFBFB"  
+      navbar-bg: "#22223b"
+      sidebar-bg: "#22223b"
+      smart: false
+runtime: shiny
+---
+
+```{=html}
+
+<style type="text/css">
+
+.irs--shiny .irs-min, .irs--shiny .irs-max {
+    top: 0;
+    padding: 1px 3px;
+    text-shadow: none;
+    background-color: rgba(25, 25, 26, 0.1);
+    border-radius: 3px;
+    font-size: 14px;
+    line-height: 1.333;
+}
+
+.irs--shiny .irs-from, .irs--shiny .irs-to, .irs--shiny .irs-single {
+    color: #FBFBFB;
+    text-shadow: none;
+    padding: 1px 3px;
+    background-color: #5c0b55;
+    border-radius: 3px;
+    font-size: 14px;
+    line-height: 1.333;
+}
+
+.irs--shiny .irs-bar {
+    top: 25px;
+    height: 8px;
+    border-top: 1px solid #5c0b55;
+    border-bottom: 1px solid #5c0b55;
+    background: #5c0b55;
+    cursor: s-resize;
+    z-index: 2;
+}
+
+.error-highlight {
+  border: 2px solid #ff0000 !important;
+  background-color: #ffeeee !important;
+}
+
+body hr {
+    border-color: #28282b;
+    margin: 10px 0;
+}
+
+.rt-bordered .rt-table, .rt-outlined .rt-table {
+    border-style: solid;
+    border-top-left-radius: 1.25rem;
+}
+
+h4, .h4 {
+    font-size: 10px;
+}
+
+.chart-wrapper .chart-stage {
+    color: #000000;
+    padding: 0px;
+}
+
+.navbar.navbar-inverse {
+    background-color: #5c0b55 !important;
+    border-bottom-right-radius: 5.25rem;
+}
+
+.navbar-brand, .navbar.navbar-inverse .navbar-brand {
+    color: white !important;
+}
+
+.navbar-brand:hover, .navbar.navbar-inverse .navbar-brand:hover {
+    color: white !important;
+}
+
+.nav-tabs-custom > .nav-tabs > li.active {
+    border-top-color: #28282b;
+}
+
+.navbar.navbar-inverse ul.nav.navbar-nav>li {
+    color: #fff;
+    font-size: 16px;
+    font-family: "TT Norms Pro";
+}
+
+.nav-tabs-custom > .nav-tabs {
+    margin: 0;
+    border-bottom: 1px solid #28282b;
+    color: white;
+    border-top-right-radius: 10px;
+    border-top-left-radius: 3px;
+    font-family: "Tw Cen MT";
+}
+
+.chart-wrapper, .nav-tabs-custom, .sbframe-commentary {
+    background: #FFFFFF;
+    border: 1px solid #B2B2B2;
+    border-radius: 0.25rem;
+    margin-bottom: 8px;
+    margin-right: 8px;
+}
+
+.navbar-brand {
+    font-family: "TT Norms Pro Black";
+    font-size: 36px;
+    padding: 0px;
+}
+
+.bootstrap-switch .bootstrap-switch-handle-on.bootstrap-switch-primary, 
+.bootstrap-switch .bootstrap-switch-handle-off.bootstrap-switch-primary {
+    background: #5c0b55;
+    color: rgb(255, 255, 255);
+}
+
+.bootstrap-switch .bootstrap-switch-handle-on.bootstrap-switch-default, .bootstrap-switch .bootstrap-switch-handle-off.bootstrap-switch-default {
+    background: #b096ad;
+    color: rgb(0 0 0 / 87%);
+}
+
+
+.bootstrap-switch.bootstrap-switch-focused {
+    border-color: #5c0b55;
+    outline: 0;
+    box-shadow: inset 0 1px 1px rgb(0 0 0 / 8%), 0 0 8px rgb(92 11 85 / 60%);
+}
+
+.bootstrap-switch {
+    display: inline-block;
+    direction: ltr;
+    cursor: pointer;
+    border-radius: 4px;
+    border: 1px solid #28282b;
+    position: relative;
+    text-align: left;
+    overflow: hidden;
+    line-height: 8px;
+    z-index: 0;
+    user-select: none;
+    vertical-align: middle;
+    transition: border-color ease-in-out .15s, box-shadow ease-in-out .15s;
+}
+
+.section.sidebar {
+    font-family: "TT Norms Pro";
+    font-size: 14px;
+    background-color: #28282b !important;
+    color: white;
+    padding: 0px;
+    border: 1px solid #28282b;
+    position: fixed;
+    top: 62px;
+    left: 0;
+    bottom: 0;
+    border-right: 1px solid #dee2e6;
+    background-color: rgba(39, 128, 227, 0.1);
+    padding-top: 10px;
+    padding-left: 10px;
+    padding-right: 10px;
+    visibility: hidden;
+    overflow: auto;
+}
+
+a {
+    color: #28282b;
+    font-size: 15px;
+    font-family: TT Norms Pro;
+    background-color: transparent;
+}
+
+.nav-tabs .nav-link.active, .nav-tabs>li>a.active, .nav-tabs .nav-pills>li>a.active, .nav-tabs :where(ul.nav.navbar-nav > li)>a.active, .nav-tabs .nav-item.show .nav-link, .nav-tabs .nav-item.in .nav-link, .nav-tabs .nav-item.show .nav-tabs>li>a, .nav-tabs .nav-item.in .nav-tabs>li>a, .nav-tabs .nav-item.show .nav-pills>li>a, .nav-tabs .nav-item.in .nav-pills>li>a, .nav-tabs>li.show .nav-link, .nav-tabs>li.in .nav-link, .nav-tabs>li.show .nav-tabs>li>a, .nav-tabs>li.in .nav-tabs>li>a, .nav-tabs>li.show .nav-pills>li>a, .nav-tabs>li.in .nav-pills>li>a, .nav-tabs .nav-pills>li.show .nav-link, .nav-tabs .nav-pills>li.in .nav-link, .nav-tabs .nav-pills>li.show .nav-tabs>li>a, .nav-tabs .nav-pills>li.in .nav-tabs>li>a, .nav-tabs .nav-pills>li.show .nav-pills>li>a, .nav-tabs .nav-pills>li.in .nav-pills>li>a, .nav-tabs .nav-item.show :where(ul.nav.navbar-nav > li)>a, .nav-tabs .nav-item.in :where(ul.nav.navbar-nav > li)>a, .nav-tabs>li.show :where(ul.nav.navbar-nav > li)>a, .nav-tabs>li.in :where(ul.nav.navbar-nav > li)>a, .nav-tabs .nav-pills>li.show :where(ul.nav.navbar-nav > li)>a, .nav-tabs .nav-pills>li.in :where(ul.nav.navbar-nav > li)>a, .nav-tabs .show:where(ul.nav.navbar-nav > li):not(.dropdown) .nav-link, .nav-tabs .in:where(ul.nav.navbar-nav > li):not(.dropdown) .nav-link, .nav-tabs .show:where(ul.nav.navbar-nav > li):not(.dropdown) .nav-tabs>li>a, .nav-tabs .in:where(ul.nav.navbar-nav > li):not(.dropdown) .nav-tabs>li>a, .nav-tabs .show:where(ul.nav.navbar-nav > li):not(.dropdown) .nav-pills>li>a, .nav-tabs .in:where(ul.nav.navbar-nav > li):not(.dropdown) .nav-pills>li>a, .nav-tabs .show:where(ul.nav.navbar-nav > li):not(.dropdown) :where(ul.nav.navbar-nav > li)>a, .nav-tabs .in:where(ul.nav.navbar-nav > li):not(.dropdown) :where(ul.nav.navbar-nav > li)>a {
+    color: #b814aa;
+    background-color: #FBFBFB;
+    border-color: #B7B7B7 #B7B7B7 #FBFBFB;
+}
+
+.chart-wrapper {
+    width: 100% !important;
+}
+
+.highchart-container {
+    height: 600px !important;
+    width: 100% !important;
+}
+
+pre {
+
+    font-family: "TT Norms Pro";
+    font-size: medium;
+}
+
+</style>
+
+```
+
+```{r setup-chunk}
+
+# load libraries
+library(lubridate)
+library(flexdashboard)
+library(tidyverse)
+library(highcharter)
+library(tidyr)
+library(extrafont)
+library(extrafontdb)
+library(systemfonts)
+library(sysfonts)
+library(data.table)
+library(DT)
+library(janitor)
+library(shinyWidgets)
+library(shiny)
+library(EpiEstim)
+library(shinyjs)
+library(deSolve)
+
+options(scipen = 999) # avoid scientific notations
+
+extrafont::loadfonts() # load fonts available on system
+
+# initialize reactive values
+model_results <- reactiveVal(NULL)
+current_model <- reactiveVal(NULL)
+simulation_only <- reactiveVal(TRUE)
+run_clicked <- reactiveVal(FALSE)
+params_changed <- reactiveVal(FALSE)
+previous_mode <- reactiveVal(NULL)
+bootstrap_results <- reactiveVal(NULL)
+real_data_ci <- reactiveVal(NULL)
+dataset <- reactiveVal(NULL)
+
+# date parsing function
+parse_date <- function(x, formats = c("%d/%m/%Y", "%Y-%m-%d", "%m/%d/%Y")) {
+  for (fmt in formats) {
+    parsed <- as.Date(x, format = fmt)
+    if (all(!is.na(parsed) | x == "" | is.na(x))) return(parsed)
+  }
+  stop("Unable to parse dates with provided formats")
+}
+
+# switched to data.table::fread for faster reading and processing
+observeEvent(input$file1, {
+  req(input$file1)
+  df <- fread(input$file1$datapath) %>%
+    as_tibble() %>%
+    mutate(across(everything(), trimws)) %>%
+    clean_names() %>%
+    mutate(
+      date_of_exposure = parse_date(date_of_exposure),
+      date_of_onset = parse_date(date_of_onset)
+    ) %>%
+    filter(!is.na(date_of_onset))
+  dataset(df)
+})
+
+```
+
+```{r model-functions}
+
+# differential equations
+
+# SI model ODE
+si_ode <- function(time, state, parameters) {
+  with(as.list(c(state, parameters)), {
+    dS <- -beta * S * I / N
+    dI <- beta * S * I / N
+    list(c(dS, dI))
+  })
+}
+
+# SIR model ODE
+sir_ode <- function(time, state, parameters) {
+  with(as.list(c(state, parameters)), {
+    dS <- -beta * S * I / N
+    dI <- beta * S * I / N - gamma * I
+    dR <- gamma * I
+    list(c(dS, dI, dR))
+  })
+}
+
+# SEIR model ODE
+seir_ode <- function(time, state, parameters) {
+  with(as.list(c(state, parameters)), {
+    dS <- -beta * S * I / N
+    dE <- beta * S * I / N - sigma * E
+    dI <- sigma * E - gamma * I
+    dR <- gamma * I
+    list(c(dS, dE, dI, dR))
+  })
+}
+
+# model functions for simulated data
+run_si_model <- function(N, beta, days, initial_S = NULL, initial_I = NULL) {
+
+  times <- seq(0, days, by = 1)
+  
+  # ODE simulation
+  init <- c(S = initial_S, I = initial_I)
+  parameters <- c(beta = beta, N = N)
+  sim <- ode(y = init, times = times, func = si_ode, parms = parameters)
+  sim_df <- as.data.frame(sim) %>%
+    mutate(Date = as.Date("2020-01-01") + time)
+  
+  return(sim_df)
+}
+
+run_sir_model <- function(N, beta, gamma, days, initial_S = NULL, initial_I = NULL, initial_R = NULL) {
+  
+  times <- seq(0, days, by = 1)
+  
+  # ODE simulation
+  init <- c(S = initial_S, I = initial_I, R = initial_R)
+  parameters <- c(beta = beta, gamma = gamma, N = N)
+  sim <- ode(y = init, times = times, func = sir_ode, parms = parameters)
+  sim_df <- as.data.frame(sim) %>%
+    mutate(Date = as.Date("2020-01-01") + time)
+  
+  return(sim_df)
+}
+
+run_seir_model <- function(N, beta, sigma, gamma, days, initial_S = NULL, initial_E = NULL, initial_I = NULL, initial_R = NULL) {
+  
+  times <- seq(0, days, by = 1)
+  
+  # ODE simulation
+  init <- c(S = initial_S, E = initial_E, I = initial_I, R = initial_R)
+  parameters <- c(beta = beta, sigma = sigma, gamma = gamma, N = N)
+  sim <- ode(y = init, times = times, func = seir_ode, parms = parameters)
+  sim_df <- as.data.frame(sim) %>%
+    mutate(Date = as.Date("2020-01-01") + time)
+  
+  return(sim_df)
+}
+
+# model function for real vs. simulated scenario
+run_real_model <- function(dataset, model_type, beta, sigma = NULL, gamma = NULL, N_override = NULL) {
+  N <- if (!is.null(N_override)) N_override else nrow(dataset)
+  
+  if (model_type == "SI") {
+    start_date <- min(dataset$date_of_exposure, na.rm = TRUE)
+    end_date <- max(dataset$date_of_exposure, na.rm = TRUE) + 5 # buffer period (to capture late recoveries)
+    dates <- seq.Date(start_date, end_date, by = "day")
+    times <- seq(0, length(dates) - 1, by = 1)
+    
+    # ODE simulation
+    init <- c(S = N - 1, I = 1)
+    parameters <- c(beta = beta, N = N)
+    sim <- ode(y = init, times = times, func = si_ode, parms = parameters)
+    sim_df <- as.data.frame(sim) %>%
+      mutate(Date = start_date + time)
+    
+    # real data processing
+    infection_counts <- dataset %>%
+      group_by(date_of_exposure) %>%
+      summarise(new_infections = n()) %>%
+      rename(Date = date_of_exposure) %>%
+      complete(Date = dates, fill = list(new_infections = 0))
+    
+    si_df <- data.frame(Date = dates) %>%
+      left_join(infection_counts, by = "Date") %>%
+      replace_na(list(new_infections = 0))
+    
+    si_df$S_real <- NA
+    si_df$I_real <- NA
+    si_df$S_real[1] <- N
+    si_df$I_real[1] <- 0
+    for (t in 2:length(dates)) {
+      si_df$S_real[t] <- si_df$S_real[t-1] - si_df$new_infections[t]
+      si_df$I_real[t] <- si_df$I_real[t-1] + si_df$new_infections[t]
+    }
+    
+    # ensure non-negative counts
+    si_df$S_real <- pmax(si_df$S_real, 0)
+    si_df$I_real <- pmax(si_df$I_real, 0)
+    
+    # merge simulated and real
+    sim_df <- sim_df %>%
+      left_join(select(si_df, Date, S_real, I_real), by = "Date")
+    
+    return(sim_df)
+  } else if (model_type == "SIR") {
+    start_date <- min(dataset$date_of_onset, na.rm = TRUE)
+    end_date <- max(dataset$date_of_onset, na.rm = TRUE) + ceiling(1/gamma) + 5
+    dates <- seq.Date(start_date, end_date, by = "day")
+    times <- seq(0, length(dates) - 1, by = 1)
+    
+    # ODE simulation
+    init <- c(S = N - 1, I = 1, R = 0)
+    parameters <- c(beta = beta, gamma = gamma, N = N)
+    sim <- ode(y = init, times = times, func = sir_ode, parms = parameters)
+    sim_df <- as.data.frame(sim) %>%
+      mutate(Date = start_date + time)
+    
+    # real data processing
+    onset_counts <- dataset %>%
+      group_by(date_of_onset) %>%
+      summarise(new_I = n()) %>%
+      rename(Date = date_of_onset) %>%
+      complete(Date = dates, fill = list(new_I = 0))
+    
+    recovery_counts <- dataset %>%
+      mutate(recovery_date = date_of_onset + ceiling(1/gamma)) %>% # uses the gamma parameter for recovery days
+      group_by(recovery_date) %>%
+      summarise(new_R = n()) %>%
+      rename(Date = recovery_date) %>%
+      complete(Date = dates, fill = list(new_R = 0))
+    
+    sir_df <- data.frame(Date = dates) %>%
+      left_join(onset_counts, by = "Date") %>%
+      left_join(recovery_counts, by = "Date") %>%
+      replace_na(list(new_I = 0, new_R = 0))
+    
+    sir_df$S_real <- NA
+    sir_df$I_real <- NA
+    sir_df$R_real <- NA
+    sir_df$S_real[1] <- N
+    sir_df$I_real[1] <- 0
+    sir_df$R_real[1] <- 0
+    for (t in 2:length(dates)) {
+      sir_df$S_real[t] <- sir_df$S_real[t-1] - sir_df$new_I[t]
+      sir_df$I_real[t] <- sir_df$I_real[t-1] + sir_df$new_I[t] - sir_df$new_R[t]
+      sir_df$R_real[t] <- sir_df$R_real[t-1] + sir_df$new_R[t]
+    }
+    
+    # ensure non-negative counts
+    sir_df$S_real <- pmax(sir_df$S_real, 0)
+    sir_df$I_real <- pmax(sir_df$I_real, 0)
+    sir_df$R_real <- pmax(sir_df$R_real, 0)   
+    
+    # merge simulated and real
+    sim_df <- sim_df %>%
+      left_join(select(sir_df, Date, S_real, I_real, R_real), by = "Date")
+    
+    return(sim_df)
+  } else if (model_type == "SEIR") {
+    start_date <- min(dataset$date_of_exposure, na.rm = TRUE)
+    end_date <- max(dataset$date_of_onset, na.rm = TRUE) + ceiling(1/gamma) + 5
+    dates <- seq.Date(start_date, end_date, by = "day")
+    times <- seq(0, length(dates) - 1, by = 1)
+    
+    # ODE simulation
+    init <- c(S = N - 1, E = 0, I = 1, R = 0)
+    parameters <- c(beta = beta, sigma = sigma, gamma = gamma, N = N)
+    sim <- ode(y = init, times = times, func = seir_ode, parms = parameters)
+    sim_df <- as.data.frame(sim) %>%
+      mutate(Date = start_date + time)
+    
+    # real data processing
+    exposure_counts <- dataset %>%
+      group_by(date_of_exposure) %>%
+      summarise(new_E = n()) %>%
+      rename(Date = date_of_exposure) %>%
+      complete(Date = dates, fill = list(new_E = 0))
+    
+    onset_counts <- dataset %>%
+      group_by(date_of_onset) %>%
+      summarise(new_I = n()) %>%
+      rename(Date = date_of_onset) %>%
+      complete(Date = dates, fill = list(new_I = 0))
+    
+    recovery_counts <- dataset %>%
+      mutate(recovery_date = date_of_onset + ceiling(1/gamma)) %>%
+      group_by(recovery_date) %>%
+      summarise(new_R = n()) %>%
+      rename(Date = recovery_date) %>%
+      complete(Date = dates, fill = list(new_R = 0))
+    
+    seir_df <- data.frame(Date = dates) %>%
+      left_join(exposure_counts, by = "Date") %>%
+      left_join(onset_counts, by = "Date") %>%
+      left_join(recovery_counts, by = "Date") %>%
+      replace_na(list(new_E = 0, new_I = 0, new_R = 0))
+    
+    seir_df$S_real <- NA
+    seir_df$E_real <- NA
+    seir_df$I_real <- NA
+    seir_df$R_real <- NA
+    seir_df$S_real[1] <- N
+    seir_df$E_real[1] <- 0
+    seir_df$I_real[1] <- 0
+    seir_df$R_real[1] <- 0
+    for (t in 2:length(dates)) {
+      seir_df$S_real[t] <- seir_df$S_real[t-1] - seir_df$new_E[t]
+      seir_df$E_real[t] <- seir_df$E_real[t-1] + seir_df$new_E[t] - seir_df$new_I[t]
+      seir_df$I_real[t] <- seir_df$I_real[t-1] + seir_df$new_I[t] - seir_df$new_R[t]
+      seir_df$R_real[t] <- seir_df$R_real[t-1] + seir_df$new_R[t]
+    }
+    
+    # ensure non-negative counts
+    seir_df$S_real <- pmax(seir_df$S_real, 0)
+    seir_df$E_real <- pmax(seir_df$E_real, 0)
+    seir_df$I_real <- pmax(seir_df$I_real, 0)
+    seir_df$R_real <- pmax(seir_df$R_real, 0)    
+    
+    # merge simulated and real
+    sim_df <- sim_df %>%
+      left_join(select(seir_df, Date, S_real, E_real, I_real, R_real), by = "Date")
+    
+    return(sim_df)
+  }
+}
+
+```
+
+
+```{r bootstrap-comparison-functions}
+
+# bootstrap function for comparison table
+bootstrap_comparison <- function(dataset, model_type, beta, sigma = NULL, gamma = NULL, n_boot = 10) {
+  N <- nrow(dataset)
+  boot_stats <- replicate(n_boot, {
+    boot_sample <- dataset[sample(nrow(dataset), replace = TRUE), ]
+    if (model_type == "SI") {
+      sim_df <- run_real_model(boot_sample, "SI", beta)
+    } else if (model_type == "SIR") {
+      sim_df <- run_real_model(boot_sample, "SIR", beta, gamma = gamma)
+    } else {
+      sim_df <- run_real_model(boot_sample, "SEIR", beta, sigma, gamma)
+    }
+
+    # calculate metrics for simulated data
+    sim_peak <- max(sim_df$I, na.rm = TRUE)
+    sim_duration <- as.numeric(max(sim_df$Date) - min(sim_df$Date))
+    sim_infections <- tail(sim_df$I, 1)
+    sim_peak_time <- as.numeric(sim_df$Date[which.max(sim_df$I)] - min(sim_df$Date))
+    
+    # calculate metrics for real data
+    real_peak <- max(sim_df$I_real, na.rm = TRUE)
+    real_duration <- as.numeric(max(sim_df$Date[!is.na(sim_df$I_real)]) -
+                     min(sim_df$Date[!is.na(sim_df$I_real)]))
+    real_infections <- tail(sim_df$I_real[!is.na(sim_df$I_real)], 1)
+    real_peak_time <- as.numeric(sim_df$Date[which.max(sim_df$I_real)] - 
+                      min(sim_df$Date[!is.na(sim_df$I_real)]))
+    
+    # calculate start times
+    sim_start <- min(sim_df$Date[sim_df$I > 0])
+    real_start <- min(sim_df$Date[!is.na(sim_df$I_real) & sim_df$I_real > 0])
+    delayed_start <- as.numeric(real_start - sim_start)
+
+    c(reduced_infections = round((real_infections - sim_infections), 0),
+      reduced_duration = round((real_duration - sim_duration),0),
+      reduced_peak = round((real_peak - sim_peak),0),
+      delayed_peak = round((real_peak_time - sim_peak_time),0),
+      delayed_start = round(delayed_start,0))
+  })
+
+  ci <- apply(boot_stats, 1, function(x) {
+    quantile(x, c(0.025, 0.975), na.rm = TRUE)
+  })
+
+  means <- rowMeans(boot_stats, na.rm = TRUE)
+
+  data.frame(
+    Metric = c("Reduced Infections", "Reduced Duration (days)", "Reduced Peak",
+              "Delayed Peak (days)", "Delayed Start (days)"),
+    Estimate = round(means, 2),
+    Lower_CI = round(ci[1, ], 2),
+    Upper_CI = round(ci[2, ], 2)
+  )
+}
+
+# bayesian parameter estimation using EpiEstim for R0 estimation
+bayesian_estimate_params <- function(dataset, model_type, n_samples = 100, user_beta = NULL, user_sigma = NULL, user_gamma = NULL) {
+  # estimate serial interval from data if available, else use defaults
+  if ("date_of_exposure" %in% names(dataset) && "date_of_onset" %in% names(dataset)) {
+    serial_intervals <- as.numeric(dataset$date_of_onset - dataset$date_of_exposure)
+    serial_intervals <- serial_intervals[!is.na(serial_intervals) & serial_intervals > 0]
+    
+    if (length(serial_intervals) >= 5) {
+      mean_si <- mean(serial_intervals)
+      std_si <- sd(serial_intervals)
+    } else {
+      mean_si <- 7.5
+      std_si <- 3.4
+    }
+  } else {
+    mean_si <- 7.5
+    std_si <- 3.4
+  }
+  
+  # get incidence data
+  incidence_data <- dataset %>%
+    arrange(date_of_onset) %>%
+    group_by(date_of_onset) %>%
+    summarise(I = n()) %>%
+    complete(date_of_onset = seq(min(date_of_onset), max(date_of_onset), by = "day"), 
+             fill = list(I = 0))
+  
+  # use EpiEstim to estimate R0 with uncertainty
+  if (nrow(incidence_data) >= 7) {
+    tryCatch({
+      n_days <- nrow(incidence_data)
+      t_start <- 2
+      t_end <- n_days
+      
+      R_estimates <- EpiEstim::estimate_R(
+        incidence_data$I, 
+        method = "parametric_si",
+        config = EpiEstim::make_config(list(
+          mean_si = mean_si, 
+          std_si = std_si,
+          n1 = 1000,
+          n2 = 100,
+          t_start = t_start,
+          t_end = t_end
+        ))
+      )
+      
+      R0_samples <- sample(R_estimates$R$`Mean(R)`, n_samples, replace = TRUE)
+      
+      # use user-provided gamma or estimate from data
+      if (!is.null(user_gamma)) {
+        gamma <- user_gamma
+      } else if ("date_of_onset" %in% names(dataset) && "recovery_date" %in% names(dataset)) {
+        infectious_periods <- as.numeric(dataset$recovery_date - dataset$date_of_onset)
+        infectious_periods <- infectious_periods[!is.na(infectious_periods) & infectious_periods > 0]
+        gamma <- if (length(infectious_periods) >= 3) 1 / mean(infectious_periods) else 0.14
+      } else {
+        gamma <- 0.14
+      }
+      
+      # use user-provided beta if provided, else derive from R0
+      if (!is.null(user_beta)) {
+        beta_samples <- rnorm(n_samples, user_beta, user_beta * 0.1)  # Add 10% noise
+        beta_samples <- pmax(0.1, pmin(3.0, beta_samples))
+      } else {
+        beta_samples <- R0_samples * gamma
+      }
+      
+      gamma_samples <- rnorm(n_samples, gamma, gamma * 0.2)
+      gamma_samples <- pmax(0.05, pmin(0.5, gamma_samples))
+      
+      if (model_type == "SEIR") {
+        if (!is.null(user_sigma)) {
+          sigma_mean <- user_sigma
+        } else if ("date_of_exposure" %in% names(dataset)) {
+          incubation_periods <- as.numeric(dataset$date_of_onset - dataset$date_of_exposure)
+          incubation_periods <- incubation_periods[!is.na(incubation_periods) & incubation_periods > 0]
+          sigma_mean <- if (length(incubation_periods) >= 3) 1 / mean(incubation_periods) else 0.2
+        } else {
+          sigma_mean <- 0.2
+        }
+        sigma_samples <- rnorm(n_samples, sigma_mean, sigma_mean * 0.3)
+        sigma_samples <- pmax(0.1, pmin(1.0, sigma_samples))
+      } else {
+        sigma_samples <- rep(0.2, n_samples)
+      }
+      
+      return(list(
+        beta_samples = beta_samples,
+        gamma_samples = gamma_samples,
+        sigma_samples = sigma_samples,
+        R0_samples = R0_samples
+      ))
+      
+    }, error = function(e) {
+      return(fallback_param_estimation(dataset, model_type, n_samples, user_beta, user_sigma, user_gamma))
+    })
+  } else {
+    return(fallback_param_estimation(dataset, model_type, n_samples, user_beta, user_sigma, user_gamma))
+  }
+}
+
+# if insufficient sample size use this as a fallback
+
+fallback_param_estimation <- function(dataset, model_type, n_samples = 100, user_beta = NULL, user_sigma = NULL, user_gamma = NULL) {
+  total_cases <- nrow(dataset)
+  
+  beta_mean <- if (!is.null(user_beta)) user_beta else min(2.0, total_cases / 20)
+  beta_samples <- rnorm(n_samples, beta_mean, beta_mean * 0.4)
+  beta_samples <- pmax(0.1, pmin(3.0, beta_samples))
+  
+  gamma_mean <- if (!is.null(user_gamma)) user_gamma else 0.14
+  gamma_samples <- rnorm(n_samples, gamma_mean, gamma_mean * 0.3)
+  gamma_samples <- pmax(0.05, pmin(0.5, gamma_samples))
+  
+  sigma_mean <- if (!is.null(user_sigma)) user_sigma else 0.2
+  sigma_samples <- rnorm(n_samples, sigma_mean, sigma_mean * 0.3)
+  sigma_samples <- pmax(0.1, pmin(1.0, sigma_samples))
+  
+  R0_samples <- beta_samples / gamma_samples
+  
+  return(list(
+    beta_samples = beta_samples,
+    gamma_samples = gamma_samples,
+    sigma_samples = sigma_samples,
+    R0_samples = R0_samples
+  ))
+}
+
+# function to run bayesian bootsrap estimates
+run_bayesian_bootstrap_ci <- function(dataset, model_type, beta, sigma = NULL, gamma = NULL, n_boot = 10, N_override = NULL) {
+  N <- if (!is.null(N_override)) N_override else nrow(dataset)
+  
+  # use bayesian_estimate_params to generate parameter samples, respecting user inputs
+  param_samples <- bayesian_estimate_params(dataset, model_type, n_samples = n_boot, 
+                                           user_beta = beta, user_sigma = sigma, user_gamma = gamma)
+  
+  beta_samples <- param_samples$beta_samples
+  gamma_samples <- param_samples$gamma_samples
+  sigma_samples <- param_samples$sigma_samples
+  
+  # reference simulation using median of parameter samples
+  ref_beta <- median(beta_samples, na.rm = TRUE)
+  ref_gamma <- if (model_type %in% c("SIR", "SEIR")) median(gamma_samples, na.rm = TRUE) else NULL
+  ref_sigma <- if (model_type == "SEIR") median(sigma_samples, na.rm = TRUE) else NULL
+  
+  reference_result <- if (model_type == "SI") {
+    run_real_model(dataset, "SI", ref_beta, N_override = N)
+  } else if (model_type == "SIR") {
+    run_real_model(dataset, "SIR", ref_beta, gamma = ref_gamma, N_override = N)
+  } else {
+    run_real_model(dataset, "SEIR", ref_beta, ref_sigma, ref_gamma, N_override = N)
+  }
+  
+  reference_dates <- reference_result$Date
+  n_days <- length(reference_dates)
+  
+  # run bootstrap simulations
+  bootstrap_replicates <- list()
+  valid_replicates <- 0
+  
+  for (i in 1:n_boot) {
+    tryCatch({
+      # add slight noise to initial conditions for SI model to ensure variability
+      if (model_type == "SI") {
+        boot_dataset <- dataset
+        if ("date_of_exposure" %in% names(boot_dataset)) {
+          # perturb exposure dates slightly
+          boot_dataset$date_of_exposure <- boot_dataset$date_of_exposure + 
+            sample(c(-1, 0, 1), nrow(boot_dataset), replace = TRUE)
+        }
+        result <- run_real_model(boot_dataset, "SI", beta_samples[i], N_override = N)
+      } else if (model_type == "SIR") {
+        result <- run_real_model(dataset, "SIR", beta_samples[i], 
+                                gamma = gamma_samples[i], N_override = N)
+      } else {
+        result <- run_real_model(dataset, "SEIR", beta_samples[i], 
+                                sigma_samples[i], gamma_samples[i], 
+                                N_override = N)
+      }
+      
+      # align with reference time frame
+      result <- merge(data.frame(Date = reference_dates), result, by = "Date", all.x = TRUE)
+      
+      # fill missing values
+      result <- result %>%
+        fill(-Date, .direction = "down") %>%
+        fill(-Date, .direction = "up")
+      
+      result[is.na(result)] <- 0
+      bootstrap_replicates[[length(bootstrap_replicates) + 1]] <- result
+      valid_replicates <- valid_replicates + 1
+    }, error = function(e) {
+      message("Bootstrap iteration ", i, " failed: ", e$message)
+    })
+  }
+  
+  # check if enough valid replicates
+  if (valid_replicates < 3) {
+    warning("Insufficient valid bootstrap replicates (", valid_replicates, "). Using perturbed reference result.")
+    bootstrap_replicates <- lapply(1:3, function(i) {
+      perturbed <- reference_result
+      perturbed$S <- pmax(0, perturbed$S + rnorm(nrow(perturbed), 0, N * 0.05))
+      perturbed$I <- pmax(0, perturbed$I + rnorm(nrow(perturbed), 0, N * 0.05))
+      if ("R" %in% names(perturbed)) perturbed$R <- pmax(0, perturbed$R + rnorm(nrow(perturbed), 0, N * 0.05))
+      if ("E" %in% names(perturbed)) perturbed$E <- pmax(0, perturbed$E + rnorm(nrow(perturbed), 0, N * 0.05))
+      perturbed
+    })
+    valid_replicates <- 3
+  }
+  
+  # calculate quantiles for each compartment
+  compartments <- c("S", "I", "R", "E")
+  available_compartments <- intersect(compartments, names(bootstrap_replicates[[1]]))
+  
+  ci_results <- list()
+  
+  for (comp in available_compartments) {
+    comp_data <- lapply(bootstrap_replicates, function(df) {
+      df[[comp]]
+    })
+    
+    comp_matrix <- do.call(cbind, comp_data)
+    
+    quantiles <- apply(comp_matrix, 1, function(x) {
+      x_clean <- x[!is.na(x) & is.finite(x)]
+      if (length(x_clean) >= 3) {
+        quantile(x_clean, probs = c(0.025, 0.05, 0.125, 0.25, 0.75, 0.875, 0.95, 0.975), 
+                na.rm = TRUE, names = FALSE)
+      } else {
+        ref_vals <- reference_result[[comp]][1:length(x)]
+        ref_vals + rnorm(length(ref_vals), 0, max(1, max(ref_vals, na.rm = TRUE) * 0.05))  # Add small noise
+      }
+    })
+    
+    ci_results[[comp]] <- as.data.frame(t(quantiles))
+    names(ci_results[[comp]]) <- c("ci_2.5", "ci_5", "ci_12.5", "ci_25", "ci_75", "ci_87.5", "ci_95", "ci_97.5")
+    ci_results[[comp]]$Date <- reference_dates
+  }
+  
+  return(ci_results)
+}
+
+# get ci estimates by sampling real data
+run_real_data_ci <- function(dataset, model_type, n_boot = 10, N_override = NULL, gamma = NULL) {
+  N <- if (!is.null(N_override)) N_override else nrow(dataset)
+  
+  if (is.null(dataset) || nrow(dataset) == 0) {
+    return(NULL)
+  }
+  
+  if (model_type == "SI") {
+    exposures <- dataset$date_of_exposure[!is.na(dataset$date_of_exposure)]
+    if (length(exposures) == 0) return(NULL)
+    start_date <- min(exposures)
+    end_date <- max(exposures) + 5
+  } else if (model_type == "SIR") {
+    onsets <- dataset$date_of_onset[!is.na(dataset$date_of_onset)]
+    if (length(onsets) == 0) return(NULL)
+    start_date <- min(onsets)
+    recovery_days <- if (!is.null(gamma)) ceiling(1 / gamma) else 7
+    end_date <- max(onsets) + recovery_days + 5
+  } else if (model_type == "SEIR") {
+    exposures <- dataset$date_of_exposure[!is.na(dataset$date_of_exposure)]
+    onsets <- dataset$date_of_onset[!is.na(dataset$date_of_onset)]
+    if (length(exposures) == 0 || length(onsets) == 0) return(NULL)
+    start_date <- min(exposures)
+    recovery_days <- if (!is.null(gamma)) ceiling(1 / gamma) else 7
+    end_date <- max(onsets) + recovery_days + 5
+  }
+  
+  dates <- seq.Date(start_date, end_date, by = "day")
+  all_dates <- dates
+  
+  ci_results <- list()
+  
+  for (comp in c("S", "E", "I", "R")) {
+    comp_matrix <- matrix(NA, nrow = length(all_dates), ncol = n_boot)
+    valid_count <- 0
+    
+    for (i in 1:n_boot) {
+      tryCatch({
+        case_ids <- sample(nrow(dataset), replace = TRUE)
+        boot_sample <- dataset[case_ids, ]
+        
+        comp_counts <- calculate_compartment_counts(boot_sample, model_type, all_dates, N_override = N, gamma = gamma)
+        
+        comp_matrix[, i] <- comp_counts[[comp]]
+        valid_count <- valid_count + 1
+      }, error = function(e) {
+        message("Bootstrap iteration ", i, " failed: ", e$message)
+        comp_matrix[, i] <- NA
+      })
+    }
+    
+    if (valid_count > 0) {
+      quantiles <- apply(comp_matrix, 1, function(x) {
+        x_clean <- x[!is.na(x) & is.finite(x)]
+        if (length(x_clean) > 0) {
+          quantile(x_clean, probs = c(0.025, 0.05, 0.125, 0.25, 0.75, 0.875, 0.95, 0.975), 
+                  na.rm = TRUE, names = FALSE)
+        } else {
+          rep(NA, 8)
+        }
+      })
+      
+      ci_results[[comp]] <- as.data.frame(t(quantiles))
+      names(ci_results[[comp]]) <- c("ci_2.5", "ci_5", "ci_12.5", "ci_25", "ci_75", "ci_87.5", "ci_95", "ci_97.5")
+      ci_results[[comp]]$Date <- all_dates
+    } else {
+      ci_results[[comp]] <- NULL
+    }
+  }
+  
+  if (all(sapply(ci_results, is.null))) {
+    return(NULL)
+  }
+  
+  return(ci_results)
+}
+
+# helper function to calculate compartment counts
+calculate_compartment_counts <- function(dataset, model_type, dates, N_override = NULL, gamma = NULL) {
+  N <- if (!is.null(N_override)) N_override else nrow(dataset)
+  results <- data.frame(Date = dates, S = NA, E = NA, I = NA, R = NA)
+  
+  dates <- as.Date(dates)
+  
+  recovery_days <- if (!is.null(gamma)) ceiling(1 / gamma) else 7
+  
+  if (model_type == "SI") {
+    exposure_counts <- dataset %>%
+      mutate(date_of_exposure = as.Date(date_of_exposure)) %>%
+      group_by(date_of_exposure) %>%
+      summarise(new_E = n()) %>%
+      complete(date_of_exposure = dates, fill = list(new_E = 0))
+    
+    results$S <- N - cumsum(exposure_counts$new_E)
+    results$I <- cumsum(exposure_counts$new_E)
+    
+  } else if (model_type == "SIR") {
+    onset_counts <- dataset %>%
+      mutate(date_of_onset = as.Date(date_of_onset)) %>%
+      group_by(date_of_onset) %>%
+      summarise(new_I = n()) %>%
+      complete(date_of_onset = dates, fill = list(new_I = 0))
+    
+    recovery_data <- dataset %>%
+      mutate(
+        date_of_onset = as.Date(date_of_onset),
+        recovery_date = ifelse(!is.na(date_of_onset), date_of_onset + recovery_days, NA)
+      ) %>%
+      filter(!is.na(recovery_date))
+    
+    recovery_counts <- recovery_data %>%
+      mutate(recovery_date = as.Date(recovery_date)) %>%
+      group_by(recovery_date) %>%
+      summarise(new_R = n()) %>%
+      complete(recovery_date = dates, fill = list(new_R = 0))
+    
+    results$S <- NA
+    results$I <- NA
+    results$R <- NA
+    
+    results$S[1] <- N
+    results$I[1] <- 0
+    results$R[1] <- 0
+    
+    for (t in 2:length(dates)) {
+      results$S[t] <- results$S[t-1] - onset_counts$new_I[t]
+      results$I[t] <- results$I[t-1] + onset_counts$new_I[t] - recovery_counts$new_R[t]
+      results$R[t] <- results$R[t-1] + recovery_counts$new_R[t]
+    }
+    
+  } else if (model_type == "SEIR") {
+    exposure_counts <- dataset %>%
+      mutate(date_of_exposure = as.Date(date_of_exposure)) %>%
+      group_by(date_of_exposure) %>%
+      summarise(new_E = n()) %>%
+      complete(date_of_exposure = dates, fill = list(new_E = 0))
+    
+    onset_counts <- dataset %>%
+      mutate(date_of_onset = as.Date(date_of_onset)) %>%
+      group_by(date_of_onset) %>%
+      summarise(new_I = n()) %>%
+      complete(date_of_onset = dates, fill = list(new_I = 0))
+    
+    recovery_data <- dataset %>%
+      mutate(
+        date_of_onset = as.Date(date_of_onset),
+        recovery_date = ifelse(!is.na(date_of_onset), date_of_onset + recovery_days, NA)
+      ) %>%
+      filter(!is.na(recovery_date))
+    
+    recovery_counts <- recovery_data %>%
+      mutate(recovery_date = as.Date(recovery_date)) %>%
+      group_by(recovery_date) %>%
+      summarise(new_R = n()) %>%
+      complete(recovery_date = dates, fill = list(new_R = 0))
+    
+    results$S <- NA
+    results$E <- NA
+    results$I <- NA
+    results$R <- NA
+    
+    results$S[1] <- N
+    results$E[1] <- 0
+    results$I[1] <- 0
+    results$R[1] <- 0
+    
+    for (t in 2:length(dates)) {
+      results$S[t] <- results$S[t-1] - exposure_counts$new_E[t]
+      results$E[t] <- results$E[t-1] + exposure_counts$new_E[t] - onset_counts$new_I[t]
+      results$I[t] <- results$I[t-1] + onset_counts$new_I[t] - recovery_counts$new_R[t]
+      results$R[t] <- results$R[t-1] + recovery_counts$new_R[t]
+    }
+  }
+  
+  results[,-1] <- lapply(results[,-1], function(x) pmax(0, x, na.rm = TRUE))
+  
+  return(results)
+}
+
+```
+
+
+```{r viz-functions}
+
+si_viz <- function(results, separate = FALSE, simulation_only = FALSE) {
+  results <- results %>%
+    mutate(Days = as.numeric(Date - min(Date)))
+  
+  si_long <- results %>% 
+    select(Days, S, I) %>%
+    pivot_longer(cols = c(S, I), 
+                 names_to = "Compartment", 
+                 values_to = "Count") %>%
+    mutate(Type = "Simulated") 
+  
+  if (!simulation_only) {
+    real_long <- results %>%
+      select(Days, S_real, I_real) %>%
+      pivot_longer(cols = c(S_real, I_real), 
+                   names_to = "Compartment", 
+                   values_to = "Count") %>%
+      mutate(Type = "Real",
+             Compartment = gsub("_real", "", Compartment))
+    
+    si_long <- bind_rows(si_long, real_long)
+  }
+  
+  if (separate) {
+    hc <- highchart() %>%
+      hc_add_series(
+        data = si_long %>% filter(Compartment == "S", Type == "Simulated"),
+        type = "spline",
+        hcaes(x = Days, y = Count),
+        name = "Susceptible (Simulated)",
+        color = "#1f77b4",
+        dashStyle = "Dash",
+        lineWidth = 2,
+        marker = list(enabled = FALSE)
+      ) %>%
+      hc_title(text = "Susceptible Population", style = list(fontSize = "18px", fontFamily = "Tw Cen MT", fontWeight = "bold")) %>%
+      hc_xAxis(
+        title = list(text = "Time From Epidemic Onset (Days)", style = list(fontFamily = "Tw Cen MT")),
+        labels = list(format = "{value:.0f}")
+      ) %>%
+      hc_yAxis(title = list(text = "Number of Individuals", style = list(fontFamily = "Tw Cen MT"))) %>%
+      hc_tooltip(
+        shared = TRUE,
+        crosshairs = TRUE,
+        headerFormat = "<b>Day {point.x:.0f}</b><br/>",
+        pointFormat = "{series.name}: <b>{point.y:.0f}</b><br/>"
+      ) %>%
+      hc_legend(enabled = TRUE) %>%
+      hc_exporting(
+        enabled = TRUE,
+        buttons = list(
+          contextButton = list(
+            menuItems = c("downloadPNG", "downloadPDF")
+          )
+        ),
+        chartOptions = list(
+          chart = list(
+            backgroundColor = "#FFFFFF"
+          )
+        )
+      ) %>%
+      hc_chart(
+        backgroundColor = "#FBFBFB",
+        style = list(fontFamily = "Tw Cen MT")
+      )
+    
+    if (!simulation_only) {
+      hc <- hc %>%
+        hc_add_series(
+          data = si_long %>% filter(Compartment == "S", Type == "Real"),
+          type = "spline",
+          hcaes(x = Days, y = Count),
+          name = "Susceptible (Real)",
+          color = "#1f77b4",
+          dashStyle = "Solid",
+          lineWidth = 2,
+          marker = list(enabled = FALSE)
+        )
+    }
+    
+    return(hc)
+  } else {
+    hc <- highchart() %>%
+      hc_add_series(
+        data = si_long %>% filter(Compartment == "S", Type == "Simulated"),
+        type = "spline",
+        hcaes(x = Days, y = Count),
+        name = "Susceptible (Simulated)",
+        color = "#1f77b4",
+        dashStyle = "Dash",
+        lineWidth = 2,
+        marker = list(enabled = FALSE)
+      ) %>%
+      hc_add_series(
+        data = si_long %>% filter(Compartment == "I", Type == "Simulated"),
+        type = "spline",
+        hcaes(x = Days, y = Count),
+        name = "Infected (Simulated)",
+        color = "#d62728",
+        dashStyle = "Dash",
+        lineWidth = 2,
+        marker = list(enabled = FALSE)
+      ) %>%
+      hc_title(text = "SI Model", style = list(fontSize = "18px", fontFamily = "Tw Cen MT", fontWeight = "bold")) %>%
+      hc_xAxis(
+        title = list(text = "Time From Epidemic Onset (Days)", style = list(fontFamily = "Tw Cen MT")),
+        labels = list(format = "{value:.0f}")
+      ) %>%
+      hc_yAxis(title = list(text = "Number of Individuals", style = list(fontFamily = "Tw Cen MT"))) %>%
+      hc_tooltip(
+        shared = TRUE,
+        crosshairs = TRUE,
+        headerFormat = "<b>Day {point.x:.0f}</b><br/>",
+        pointFormat = "{series.name}: <b>{point.y:.0f}</b><br/>"
+      ) %>%
+      hc_legend(itemStyle = list(fontFamily = "Tw Cen MT")) %>%
+      hc_exporting(
+        enabled = TRUE,
+        buttons = list(
+          contextButton = list(
+            menuItems = c("downloadPNG", "downloadPDF")
+          )
+        ),
+        chartOptions = list(
+          chart = list(
+            backgroundColor = "#FFFFFF"
+          )
+        )
+      ) %>%
+      hc_chart(
+        backgroundColor = "#FBFBFB",
+        style = list(fontFamily = "Tw Cen MT")
+      )
+    
+    if (!simulation_only) {
+      hc <- hc %>%
+        hc_add_series(
+          data = si_long %>% filter(Compartment == "S", Type == "Real"),
+          type = "spline",
+          hcaes(x = Days, y = Count),
+          name = "Susceptible (Real)",
+          color = "#1f77b4",
+          dashStyle = "Solid",
+          lineWidth = 2,
+          marker = list(enabled = FALSE)
+        ) %>%
+        hc_add_series(
+          data = si_long %>% filter(Compartment == "I", Type == "Real"),
+          type = "spline",
+          hcaes(x = Days, y = Count),
+          name = "Infected (Real)",
+          color = "#d62728",
+          dashStyle = "Solid",
+          lineWidth = 2,
+          marker = list(enabled = FALSE)
+        )
+    }
+    
+    return(hc)
+  }
+}
+
+sir_viz <- function(results, separate = FALSE, simulation_only = FALSE) {
+  results <- results %>%
+    mutate(Days = as.numeric(Date - min(Date)))
+  
+  sir_long <- results %>%
+    select(Days, S, I, R) %>%
+    pivot_longer(cols = c(S, I, R), 
+                 names_to = "Compartment", 
+                 values_to = "Count") %>%
+    mutate(Type = "Simulated")
+  
+  if (!simulation_only) {
+    real_long <- results %>%
+      select(Days, S_real, I_real, R_real) %>%
+      pivot_longer(cols = c(S_real, I_real, R_real), 
+                   names_to = "Compartment", 
+                   values_to = "Count") %>%
+      mutate(Type = "Real",
+             Compartment = gsub("_real", "", Compartment))
+    
+    sir_long <- bind_rows(sir_long, real_long)
+  }
+  
+  if (separate) {
+    hc <- highchart() %>%
+      hc_add_series(
+        data = sir_long %>% filter(Compartment == "S", Type == "Simulated"),
+        type = "spline",
+        hcaes(x = Days, y = Count),
+        name = "Susceptible (Simulated)",
+        color = "#1f77b4",
+        dashStyle = "Dash",
+        lineWidth = 2,
+        marker = list(enabled = FALSE)
+      ) %>%
+      hc_title(text = "Susceptible Population", style = list(fontSize = "18px", fontFamily = "Tw Cen MT", fontWeight = "bold")) %>%
+      hc_xAxis(
+        title = list(text = "Time From Epidemic Onset (Days)", style = list(fontFamily = "Tw Cen MT")),
+        labels = list(format = "{value:.0f}")
+      ) %>%
+      hc_yAxis(title = list(text = "Number of Individuals", style = list(fontFamily = "Tw Cen MT"))) %>%
+      hc_tooltip(
+        shared = TRUE,
+        crosshairs = TRUE,
+        headerFormat = "<b>Day {point.x:.0f}</b><br/>",
+        pointFormat = "{series.name}: <b>{point.y:.0f}</b><br/>"
+      ) %>%
+      hc_legend(enabled = TRUE) %>%
+      hc_exporting(
+        enabled = TRUE,
+        buttons = list(
+          contextButton = list(
+            menuItems = c("downloadPNG", "downloadPDF")
+          )
+        ),
+        chartOptions = list(
+          chart = list(
+            backgroundColor = "#FFFFFF"
+          )
+        )
+      ) %>%
+      hc_chart(
+        backgroundColor = "#FBFBFB",
+        style = list(fontFamily = "Tw Cen MT")
+      )
+    
+    if (!simulation_only) {
+      hc <- hc %>%
+        hc_add_series(
+          data = sir_long %>% filter(Compartment == "S", Type == "Real"),
+          type = "spline",
+          hcaes(x = Days, y = Count),
+          name = "Susceptible (Real)",
+          color = "#1f77b4",
+          dashStyle = "Solid",
+          lineWidth = 2,
+          marker = list(enabled = FALSE)
+        )
+    }
+    
+    return(hc)
+  } else {
+    hc <- highchart() %>%
+      hc_add_series(
+        data = sir_long %>% filter(Compartment == "S", Type == "Simulated"),
+        type = "spline",
+        hcaes(x = Days, y = Count),
+        name = "Susceptible (Simulated)",
+        color = "#1f77b4",
+        dashStyle = "Dash",
+        lineWidth = 2,
+        marker = list(enabled = FALSE)
+      ) %>%
+      hc_add_series(
+        data = sir_long %>% filter(Compartment == "I", Type == "Simulated"),
+        type = "spline",
+        hcaes(x = Days, y = Count),
+        name = "Infected (Simulated)",
+        color = "#d62728",
+        dashStyle = "Dash",
+        lineWidth = 2,
+        marker = list(enabled = FALSE)
+      ) %>%
+      hc_add_series(
+        data = sir_long %>% filter(Compartment == "R", Type == "Simulated"),
+        type = "spline",
+        hcaes(x = Days, y = Count),
+        name = "Recovered (Simulated)",
+        color = "#2ca02c",
+        dashStyle = "Dash",
+        lineWidth = 2,
+        marker = list(enabled = FALSE)
+      ) %>%
+      hc_title(text = "SIR Model", style = list(fontSize = "18px", fontFamily = "Tw Cen MT", fontWeight = "bold")) %>%
+      hc_xAxis(
+        title = list(text = "Time From Epidemic Onset (Days)", style = list(fontFamily = "Tw Cen MT")),
+        labels = list(format = "{value:.0f}")
+      ) %>%
+      hc_yAxis(title = list(text = "Number of Individuals", style = list(fontFamily = "Tw Cen MT"))) %>%
+      hc_tooltip(
+        shared = TRUE,
+        crosshairs = TRUE,
+        headerFormat = "<b>Day {point.x:.0f}</b><br/>",
+        pointFormat = "{series.name}: <b>{point.y:.0f}</b><br/>"
+      ) %>%
+      hc_legend(itemStyle = list(fontFamily = "Tw Cen MT")) %>%
+      hc_exporting(
+        enabled = TRUE,
+        buttons = list(
+          contextButton = list(
+            menuItems = c("downloadPNG", "downloadPDF")
+          )
+        ),
+        chartOptions = list(
+          chart = list(
+            backgroundColor = "#FFFFFF"
+          )
+        )
+      ) %>%
+      hc_chart(
+        backgroundColor = "#FBFBFB",
+        style = list(fontFamily = "Tw Cen MT")
+      )
+    
+    if (!simulation_only) {
+      hc <- hc %>%
+        hc_add_series(
+          data = sir_long %>% filter(Compartment == "S", Type == "Real"),
+          type = "spline",
+          hcaes(x = Days, y = Count),
+          name = "Susceptible (Real)",
+          color = "#1f77b4",
+          dashStyle = "Solid",
+          lineWidth = 2,
+          marker = list(enabled = FALSE)
+        ) %>%
+        hc_add_series(
+          data = sir_long %>% filter(Compartment == "I", Type == "Real"),
+          type = "spline",
+          hcaes(x = Days, y = Count),
+          name = "Infected (Real)",
+          color = "#d62728",
+          dashStyle = "Solid",
+          lineWidth = 2,
+          marker = list(enabled = FALSE)
+        ) %>%
+        hc_add_series(
+          data = sir_long %>% filter(Compartment == "R", Type == "Real"),
+          type = "spline",
+          hcaes(x = Days, y = Count),
+          name = "Recovered (Real)",
+          color = "#2ca02c",
+          dashStyle = "Solid",
+          lineWidth = 2,
+          marker = list(enabled = FALSE)
+        )
+    }
+    
+    return(hc)
+  }
+}
+
+seir_viz <- function(results, separate = FALSE, simulation_only = FALSE) {
+  results <- results %>%
+    mutate(Days = as.numeric(Date - min(Date)))
+  
+  seir_long <- results %>%
+    select(Days, S, E, I, R) %>%
+    pivot_longer(cols = c(S, E, I, R), 
+                 names_to = "Compartment", 
+                 values_to = "Count") %>%
+    mutate(Type = "Simulated")
+  
+  if (!simulation_only) {
+    real_long <- results %>%
+      select(Days, S_real, E_real, I_real, R_real) %>%
+      pivot_longer(cols = c(S_real, E_real, I_real, R_real), 
+                   names_to = "Compartment", 
+                   values_to = "Count") %>%
+      mutate(Type = "Real",
+             Compartment = gsub("_real", "", Compartment))
+    
+    seir_long <- bind_rows(seir_long, real_long)
+  }
+  
+  if (separate) {
+    hc <- highchart() %>%
+      hc_add_series(
+        data = seir_long %>% filter(Compartment == "S", Type == "Simulated"),
+        type = "spline",
+        hcaes(x = Days, y = Count),
+        name = "Susceptible (Simulated)",
+        color = "#1f77b4",
+        dashStyle = "Dash",
+        lineWidth = 2,
+        marker = list(enabled = FALSE)
+      ) %>%
+      hc_title(text = "Susceptible Population", style = list(fontSize = "18px", fontFamily = "Tw Cen MT", fontWeight = "bold")) %>%
+      hc_xAxis(
+        title = list(text = "Time From Epidemic Onset (Days)", style = list(fontFamily = "Tw Cen MT")),
+        labels = list(format = "{value:.0f}")
+      ) %>%
+      hc_yAxis(title = list(text = "Number of Individuals", style = list(fontFamily = "Tw Cen MT"))) %>%
+      hc_tooltip(
+        shared = TRUE,
+        crosshairs = TRUE,
+        headerFormat = "<b>Day {point.x:.0f}</b><br/>",
+        pointFormat = "{series.name}: <b>{point.y:.0f}</b><br/>"
+      ) %>%
+      hc_legend(enabled = TRUE) %>%
+      hc_exporting(
+        enabled = TRUE,
+        buttons = list(
+          contextButton = list(
+            menuItems = c("downloadPNG", "downloadPDF")
+          )
+        ),
+        chartOptions = list(
+          chart = list(
+            backgroundColor = "#FFFFFF"
+          )
+        )
+      ) %>%
+      hc_chart(
+        backgroundColor = "#FBFBFB",
+        style = list(fontFamily = "Tw Cen MT")
+      )
+    
+    if (!simulation_only) {
+      hc <- hc %>%
+        hc_add_series(
+          data = seir_long %>% filter(Compartment == "S", Type == "Real"),
+          type = "spline",
+          hcaes(x = Days, y = Count),
+          name = "Susceptible (Real)",
+          color = "#1f77b4",
+          dashStyle = "Solid",
+          lineWidth = 2,
+          marker = list(enabled = FALSE)
+        )
+    }
+    
+    return(hc)
+  } else {
+    hc <- highchart() %>%
+      hc_add_series(
+        data = seir_long %>% filter(Compartment == "S", Type == "Simulated"),
+        type = "spline",
+        hcaes(x = Days, y = Count),
+        name = "Susceptible (Simulated)",
+        color = "#1f77b4",
+        dashStyle = "Dash",
+        lineWidth = 2,
+        marker = list(enabled = FALSE)
+      ) %>%
+      hc_add_series(
+        data = seir_long %>% filter(Compartment == "E", Type == "Simulated"),
+        type = "spline",
+        hcaes(x = Days, y = Count),
+        name = "Exposed (Simulated)",
+        color = "#a51ebd",
+        dashStyle = "Dash",
+        lineWidth = 2,
+        marker = list(enabled = FALSE)
+      ) %>%
+      hc_add_series(
+        data = seir_long %>% filter(Compartment == "I", Type == "Simulated"),
+        type = "spline",
+        hcaes(x = Days, y = Count),
+        name = "Infected (Simulated)",
+        color = "#d62728",
+        dashStyle = "Dash",
+        lineWidth = 2,
+        marker = list(enabled = FALSE)
+      ) %>%
+      hc_add_series(
+        data = seir_long %>% filter(Compartment == "R", Type == "Simulated"),
+        type = "spline",
+        hcaes(x = Days, y = Count),
+        name = "Recovered (Simulated)",
+        color = "#2ca02c",
+        dashStyle = "Dash",
+        lineWidth = 2,
+        marker = list(enabled = FALSE)
+      ) %>%
+      hc_title(text = "SEIR Model", style = list(fontSize = "18px", fontFamily = "Tw Cen MT", fontWeight = "bold")) %>%
+      hc_xAxis(
+        title = list(text = "Time From Epidemic Onset (Days)", style = list(fontFamily = "Tw Cen MT")),
+        labels = list(format = "{value:.0f}")
+      ) %>%
+      hc_yAxis(title = list(text = "Number of Individuals", style = list(fontFamily = "Tw Cen MT"))) %>%
+      hc_tooltip(
+        shared = TRUE,
+        crosshairs = TRUE,
+        headerFormat = "<b>Day {point.x:.0f}</b><br/>",
+        pointFormat = "{series.name}: <b>{point.y:.0f}</b><br/>"
+      ) %>%
+      hc_legend(itemStyle = list(fontFamily = "Tw Cen MT")) %>%
+      hc_exporting(
+        enabled = TRUE,
+        buttons = list(
+          contextButton = list(
+            menuItems = c("downloadPNG", "downloadPDF")
+          )
+        ),
+        chartOptions = list(
+          chart = list(
+            backgroundColor = "#FFFFFF"
+          )
+        )
+      ) %>%
+      hc_chart(
+        backgroundColor = "#FBFBFB",
+        style = list(fontFamily = "Tw Cen MT")
+      )
+    
+    if (!simulation_only) {
+      hc <- hc %>%
+        hc_add_series(
+          data = seir_long %>% filter(Compartment == "S", Type == "Real"),
+          type = "spline",
+          hcaes(x = Days, y = Count),
+          name = "Susceptible (Real)",
+          color = "#1f77b4",
+          dashStyle = "Solid",
+          lineWidth = 2,
+          marker = list(enabled = FALSE)
+        ) %>%
+        hc_add_series(
+          data = seir_long %>% filter(Compartment == "E", Type == "Real"),
+          type = "spline",
+          hcaes(x = Days, y = Count),
+          name = "Exposed (Real)",
+          color = "#a51ebd",
+          dashStyle = "Solid",
+          lineWidth = 2,
+          marker = list(enabled = FALSE)
+        ) %>%
+        hc_add_series(
+          data = seir_long %>% filter(Compartment == "I", Type == "Real"),
+          type = "spline",
+          hcaes(x = Days, y = Count),
+          name = "Infected (Real)",
+          color = "#d62728",
+          dashStyle = "Solid",
+          lineWidth = 2,
+          marker = list(enabled = FALSE)
+        ) %>%
+        hc_add_series(
+          data = seir_long %>% filter(Compartment == "R", Type == "Real"),
+          type = "spline",
+          hcaes(x = Days, y = Count),
+          name = "Recovered (Real)",
+          color = "#2ca02c",
+          dashStyle = "Solid",
+          lineWidth = 2,
+          marker = list(enabled = FALSE)
+        )
+    }
+    
+    return(hc)
+  }
+}
+
+compartment_viz <- function(results, compartment, simulation_only = FALSE, 
+                           bootstrap_ci = NULL, real_data_ci = NULL,
+                           show_ci = list(ci_95 = FALSE, ci_90 = FALSE, ci_75 = FALSE, ci_50 = FALSE)) {
+  if (!is.null(results$Date) && all(!is.na(results$Date)) && inherits(results$Date, "Date")) {
+    min_date <- min(results$Date, na.rm = TRUE)
+    results <- results %>%
+      mutate(Days = as.numeric(Date - min_date))
+  } else {
+    results <- results %>%
+      mutate(Days = row_number() - 1)
+  }
+  
+  comp_colors <- c(
+    "S" = "#1f77b4",
+    "E" = "#a51ebd", 
+    "I" = "#d62728",
+    "R" = "#2ca02c"
+  )
+  
+  comp_name <- switch(compartment,
+                     "susceptible" = "S",
+                     "exposed" = "E",
+                     "infected" = "I",
+                     "recovered" = "R")
+  
+  comp_title <- switch(compartment,
+                      "susceptible" = "Susceptible",
+                      "exposed" = "Exposed",
+                      "infected" = "Infected",
+                      "recovered" = "Recovered")
+  
+  if (simulation_only) {
+    long_data <- results %>%
+      select(Days, !!sym(comp_name)) %>%
+      pivot_longer(cols = c(!!sym(comp_name)), names_to = "Compartment", values_to = "Count") %>%
+      mutate(Type = "Simulated")
+  } else {
+    real_col <- paste0(comp_name, "_real")
+    long_data <- results %>%
+      select(Days, !!sym(comp_name), !!sym(real_col)) %>%
+      pivot_longer(cols = c(!!sym(comp_name), !!sym(real_col)), names_to = "Compartment", values_to = "Count") %>%
+      mutate(Type = ifelse(Compartment == comp_name, "Simulated", "Real"),
+             Compartment = gsub("_real", "", Compartment))
+  }
+  
+  hc <- highchart() %>%
+    hc_title(text = paste0(comp_title, " Population"), 
+             style = list(fontSize = "18px", fontFamily = "Tw Cen MT", fontWeight = "bold")) %>%
+    hc_xAxis(
+      title = list(text = "Time From Epidemic Onset (Days)", style = list(fontFamily = "Tw Cen MT")),
+      labels = list(format = "{value:.0f}")
+    ) %>%
+    hc_yAxis(title = list(text = "Number of Individuals", style = list(fontFamily = "Tw Cen MT"))) %>%
+    hc_tooltip(
+      shared = TRUE,
+      crosshairs = TRUE,
+      formatter = JS("
+        function () {
+          var points = this.points;
+          var tooltip = '<b>Day ' + this.x.toFixed(0) + '</b><br/>';
+          points.forEach(function(point) {
+            if (point.series.type === 'areasplinerange') {
+              tooltip += point.series.name + ': <b>' + point.point.low.toFixed(0) + ' - ' + point.point.high.toFixed(0) + '</b><br/>';
+            } else {
+              tooltip += point.series.name + ': <b>' + point.y.toFixed(0) + '</b><br/>';
+            }
+          });
+          return tooltip;
+        }
+      ")
+    ) %>%
+    hc_legend(enabled = TRUE) %>%
+    hc_exporting(
+      enabled = TRUE,
+      buttons = list(
+        contextButton = list(
+          menuItems = c("downloadPNG", "downloadPDF")
+        )
+      ),
+      chartOptions = list(
+        chart = list(
+          backgroundColor = "#FFFFFF"
+        )
+      )
+    ) %>%
+    hc_chart(
+      backgroundColor = "#FBFBFB",
+      style = list(fontFamily = "Tw Cen MT")
+    )
+  
+  main_sim <- results[[comp_name]]
+  main_real <- if (!simulation_only) results[[paste0(comp_name, "_real")]] else NULL
+  
+  if ((input$ci_type == "Both" || input$ci_type == "Simulated Only") && !is.null(bootstrap_ci) && !simulation_only) {
+    ci_data <- bootstrap_ci[[comp_name]]
+    
+    if (!is.null(ci_data) && "Date" %in% names(ci_data)) {
+      ci_data_with_days <- ci_data %>%
+        mutate(Days = as.numeric(Date - min(results$Date, na.rm = TRUE))) %>%
+        filter(Days %in% results$Days) %>%
+        select(Days, starts_with("ci_"))
+      
+      if (nrow(ci_data_with_days) > 0 && any(!is.na(ci_data_with_days))) {
+        add_ci_band <- function(hc, low_col, high_col, level, opacity) {
+          band_data <- ci_data_with_days %>% 
+            select(Days, low = !!sym(low_col), high = !!sym(high_col)) %>%
+            filter(!is.na(low), !is.na(high), is.finite(low), is.finite(high))
+          
+          if (nrow(band_data) > 0) {
+            span_value <- 0.5  # More conservative smoothing
+            if (nrow(band_data) > 5) {
+              low_loess <- tryCatch({
+                loess(low ~ Days, data = band_data, span = span_value)
+              }, error = function(e) {
+                NULL
+              })
+              high_loess <- tryCatch({
+                loess(high ~ Days, data = band_data, span = span_value)
+              }, error = function(e) {
+                NULL
+              })
+              
+              if (!is.null(low_loess) && !is.null(high_loess)) {
+                band_data$low <- predict(low_loess)
+                band_data$high <- predict(high_loess)
+                
+                band_data$low <- pmax(0, band_data$low)
+                band_data$high <- pmax(0, band_data$high)
+                
+                band_data$low <- pmin(band_data$low, main_sim[match(band_data$Days, results$Days)])
+                band_data$high <- pmax(band_data$high, main_sim[match(band_data$Days, results$Days)])
+              } else {
+                band_data$low <- pmax(0, band_data$low)
+                band_data$high <- pmax(0, band_data$high)
+              }
+            }
+            
+            hc %>%
+              hc_add_series(
+                data = list_parse(band_data),
+                type = "areasplinerange",
+                name = paste0(comp_title, " Simulated CI ", level, "%"),
+                color = paste0("rgba(", paste(col2rgb(comp_colors[comp_name]), collapse = ","), ", ", opacity, ")"),
+                fillOpacity = opacity,
+                lineWidth = 0,
+                marker = list(enabled = FALSE),
+                zIndex = 1
+              )
+          } else {
+            hc
+          }
+        }
+        
+        if (show_ci$ci_95) {
+          hc <- add_ci_band(hc, "ci_2.5", "ci_97.5", "95", 0.15)
+        }
+        if (show_ci$ci_90) {
+          hc <- add_ci_band(hc, "ci_5", "ci_95", "90", 0.25)
+        }
+        if (show_ci$ci_75) {
+          hc <- add_ci_band(hc, "ci_12.5", "ci_87.5", "75", 0.35)
+        }
+        if (show_ci$ci_50) {
+          hc <- add_ci_band(hc, "ci_25", "ci_75", "50", 0.45)
+        }
+      }
+    }
+  }
+  
+  if ((input$ci_type == "Both" || input$ci_type == "Real Only") && !is.null(real_data_ci) && !simulation_only) {
+    tryCatch({
+      comp_ci <- real_data_ci[[comp_name]]
+      
+      if (!is.null(comp_ci) && "Date" %in% names(comp_ci) && nrow(comp_ci) > 0) {
+        if (all(!is.na(comp_ci$Date)) && inherits(comp_ci$Date, "Date")) {
+          real_ci_with_days <- comp_ci %>%
+            mutate(Days = as.numeric(Date - min(results$Date, na.rm = TRUE))) %>%
+            filter(Days %in% results$Days) %>%
+            filter(complete.cases(across(starts_with("ci_"))))
+          
+          if (nrow(real_ci_with_days) > 0) {
+            add_real_ci_band <- function(hc, low_col, high_col, level, opacity) {
+              band_data <- real_ci_with_days %>% 
+                select(Days, low = !!sym(low_col), high = !!sym(high_col)) %>%
+                filter(!is.na(low), !is.na(high), is.finite(low), is.finite(high))
+              
+              if (nrow(band_data) > 0) {
+                span_value <- 0.5  # More conservative smoothing
+                if (nrow(band_data) > 5) {
+                  low_loess <- tryCatch({
+                    loess(low ~ Days, data = band_data, span = span_value)
+                  }, error = function(e) {
+                    NULL
+                  })
+                  high_loess <- tryCatch({
+                    loess(high ~ Days, data = band_data, span = span_value)
+                  }, error = function(e) {
+                    NULL
+                  })
+                  
+                  if (!is.null(low_loess) && !is.null(high_loess)) {
+                    band_data$low <- predict(low_loess)
+                    band_data$high <- predict(high_loess)
+                    
+                    band_data$low <- pmax(0, band_data$low)
+                    band_data$high <- pmax(0, band_data$high)
+                    
+                    band_data$low <- pmin(band_data$low, main_real[match(band_data$Days, results$Days)])
+                    band_data$high <- pmax(band_data$high, main_real[match(band_data$Days, results$Days)])
+                  } else {
+                    band_data$low <- pmax(0, band_data$low)
+                    band_data$high <- pmax(0, band_data$high)
+                  }
+                }
+                
+                grey_value <- 100 - (as.numeric(gsub("%", "", level)) / 100 * 60)
+                grey_value <- max(40, min(100, grey_value))
+                
+                hc %>%
+                  hc_add_series(
+                    data = list_parse(band_data),
+                    type = "areasplinerange",
+                    name = paste0(comp_title, " Real CI ", level, "%"),
+                    color = paste0("rgba(", grey_value, ", ", grey_value, ", ", grey_value, ", ", opacity, ")"),
+                    fillOpacity = opacity,
+                    lineWidth = 0,
+                    marker = list(enabled = FALSE),
+                    zIndex = 0
+                  )
+              } else {
+                hc
+              }
+            }
+            
+            if (show_ci$ci_95) {
+              hc <- add_real_ci_band(hc, "ci_2.5", "ci_97.5", "95", 0.10)
+            }
+            if (show_ci$ci_90) {
+              hc <- add_real_ci_band(hc, "ci_5", "ci_95", "90", 0.15)
+            }
+            if (show_ci$ci_75) {
+              hc <- add_real_ci_band(hc, "ci_12.5", "ci_87.5", "75", 0.20)
+            }
+            if (show_ci$ci_50) {
+              hc <- add_real_ci_band(hc, "ci_25", "ci_75", "50", 0.25)
+            }
+          }
+        }
+      }
+    }, error = function(e) {
+      message("Error adding real data CI for ", comp_name, ": ", e$message)
+    })
+  }
+  
+  hc <- hc %>%
+    hc_add_series(
+      data = long_data %>% filter(Type == "Simulated"),
+      type = "spline",
+      hcaes(x = Days, y = Count),
+      name = paste0(comp_title, " (Simulated)"),
+      color = comp_colors[comp_name],
+      dashStyle = "Dash",
+      lineWidth = 2,
+      marker = list(enabled = FALSE),
+      zIndex = 5
+    )
+  
+  if (!simulation_only) {
+    hc <- hc %>%
+      hc_add_series(
+        data = long_data %>% filter(Type == "Real"),
+        type = "spline",
+        hcaes(x = Days, y = Count),
+        name = paste0(comp_title, " (Real)"),
+        color = comp_colors[comp_name],
+        dashStyle = "Solid",
+        lineWidth = 2,
+        marker = list(enabled = FALSE),
+        zIndex = 6
+      )
+  }
+  
+  return(hc)
+}
+
+
+```
+
+
+```{r params-functions}
+
+custom_datatable <- function(params) {
+  datatable(
+    params,
+    rownames = FALSE,
+    extensions = 'Buttons',
+    options = list(
+      dom = 'Brt',
+      buttons = c('csv','excel', 'pdf'),
+      pageLength = nrow(params)
+    )
+  ) %>%
+    formatStyle(
+      columns = 1:ncol(params),
+      fontSize = '14px',
+      fontFamily = 'Tw Cen MT'
+    ) %>%
+    formatStyle(
+      columns = 1:ncol(params),
+      target = 'row',
+      borderBottom = '1px solid #ddd'
+    ) %>%
+    formatStyle(
+      columns = 1:ncol(params),
+      backgroundColor = 'white'
+    ) 
+}
+
+si_params_table <- function(N, beta, days, results) {
+  
+  peak_day_sim <- results$time[which.max(results$I)]  # Get the day number where peak occurs
+  peak_value_sim <- max(results$I, na.rm = TRUE)
+  duration_sim <- as.numeric(max(results$Date) - min(results$Date))
+  final_s_sim <- tail(results$S, 1)
+  final_i_sim <- tail(results$I, 1)
+  
+  params <- data.frame(
+    Parameter = c("N", "Beta", "Initial S", "Initial I",
+                 "Final S", "Final I",
+                 "Duration (days)", "Peak Infections", 
+                 "Peak Time"), 
+    Description = c(
+      "Total population size",
+      "Transmission rate (range: 0.1-3.0 per day)",
+      "Initial susceptible population",
+      "Initial infected population",
+      "Final susceptible population",
+      "Final infected population",
+      "Duration of epidemic",
+      "Peak number of infected",
+      "Day of peak infection"
+    ),
+    Value = c(
+      as.character(N),
+      as.character(round(beta, 3)),
+      as.character(input$initial_S_si),
+      as.character(input$initial_I_si),
+      as.character(round(final_s_sim),0),
+      as.character(round(final_i_sim),0),
+      as.character(duration_sim),
+      as.character(round(peak_value_sim),0),
+      paste0("Day ", as.character(peak_day_sim))
+    )
+  )
+  
+  custom_datatable(params)
+}
+
+sir_params_table <- function(N, beta, gamma, days, results) {
+  peak_day_sim <- results$time[which.max(results$I)]
+  peak_value_sim <- max(results$I, na.rm = TRUE)
+  duration_sim <- as.numeric(max(results$Date) - min(results$Date))
+  final_s_sim <- tail(results$S, 1)
+  final_i_sim <- tail(results$I, 1)
+  final_r_sim <- tail(results$R, 1)
+  
+  params <- data.frame(
+    Parameter = c("N", "Beta", "Gamma", "R0", 
+                 "Initial S", "Initial I", "Initial R",
+                 "Final S", "Final I", "Final R",
+                 "Duration (days)", "Peak Infections", 
+                 "Peak Time", "Infectious Period"),
+    Description = c(
+      "Total population size",
+      "Transmission rate (range: 0.1-3.0 per day)",
+      "Recovery rate (range: 0.05-0.5 per day)",
+      "Basic reproduction number (Beta/Gamma)",
+      "Initial susceptible population",
+      "Initial infected population",
+      "Initial recovered population",
+      "Final susceptible population",
+      "Final infected population",
+      "Final recovered population",
+      "Duration of epidemic",
+      "Peak number of infected",
+      "Day of peak infection",
+      "Average infectious period (1/Gamma)"
+    ),
+    Value = c(
+      as.character(N),
+      as.character(round(beta, 3)),
+      as.character(round(gamma, 3)),
+      as.character(round(beta/gamma, 3)),
+      as.character(input$initial_S_sir),
+      as.character(input$initial_I_sir),
+      as.character(input$initial_R_sir),
+      as.character(round(final_s_sim)),
+      as.character(round(final_i_sim)),
+      as.character(round(final_r_sim)),
+      as.character(duration_sim),
+      as.character(round(peak_value_sim)),
+      paste0("Day ", as.character(peak_day_sim)),
+      as.character(round(1/gamma, 1))
+    )
+  )
+  
+  custom_datatable(params)
+}
+
+seir_params_table <- function(N, beta, sigma, gamma, days, results) {
+  peak_day_sim <- results$time[which.max(results$I)]  # Get the day number where peak occurs
+  peak_value_sim <- max(results$I, na.rm = TRUE)
+  duration_sim <- as.numeric(max(results$Date) - min(results$Date))
+  final_s_sim <- tail(results$S, 1)
+  final_e_sim <- tail(results$E, 1)
+  final_i_sim <- tail(results$I, 1)
+  final_r_sim <- tail(results$R, 1)
+  
+  params <- data.frame(
+    Parameter = c("N", "Beta", "Sigma", "Gamma", "R0",
+                 "Initial S", "Initial E", "Initial I", "Initial R",
+                 "Final S", "Final E", "Final I", "Final R",
+                 "Duration (days)", "Peak Infections", 
+                 "Peak Time", "Incubation Period", "Infectious Period"),
+    Description = c(
+      "Total population size",
+      "Transmission rate (range: 0.1-3.0 per day)",
+      "Exposure rate (range: 0.1-1.0 per day)",
+      "Recovery rate (range: 0.05-0.5 per day)",
+      "Basic reproduction number (Beta/Gamma)",
+      "Initial susceptible population",
+      "Initial exposed population",
+      "Initial infected population",
+      "Initial recovered population",
+      "Final susceptible population",
+      "Final exposed population",
+      "Final infected population",
+      "Final recovered population",
+      "Duration of epidemic",
+      "Peak number of infected",
+      "Day of peak infection",
+      "Average incubation period (1/Sigma)",
+      "Average infectious period (1/Gamma)"
+    ),
+    Value = c(
+      as.character(N),
+      as.character(round(beta, 3)),
+      as.character(round(sigma, 3)),
+      as.character(round(gamma, 3)),
+      as.character(round(beta/gamma, 3)),
+      as.character(input$initial_S_seir),
+      as.character(input$initial_E_seir),
+      as.character(input$initial_I_seir),
+      as.character(input$initial_R_seir),
+      as.character(round(final_s_sim)),
+      as.character(round(final_e_sim)),
+      as.character(round(final_i_sim)),
+      as.character(round(final_r_sim)),
+      as.character(duration_sim),
+      as.character(round(peak_value_sim)),
+      paste0("Day ", as.character(peak_day_sim)),
+      as.character(round(1/sigma, 1)),
+      as.character(round(1/gamma, 1))
+    )
+  )
+  
+  custom_datatable(params)
+}
+
+real_si_params_table <- function(dataset, beta, results, N_override = NULL) {
+  N <- if (!is.null(N_override)) N_override else nrow(dataset)
+  peak_day_sim <- results$time[which.max(results$I)] 
+  peak_value_sim <- max(results$I, na.rm = TRUE)
+  duration_sim <- as.numeric(max(results$Date) - min(results$Date))
+  final_s_sim <- tail(results$S, 1)
+  final_i_sim <- tail(results$I, 1)
+  
+  peak_day_real <- results$time[which.max(results$I_real)]
+  peak_value_real <- max(results$I_real, na.rm = TRUE)
+  duration_real <- as.numeric(max(results$Date[!is.na(results$I_real)]) - 
+                   min(results$Date[!is.na(results$I_real)]))
+  final_s_real <- tail(results$S_real[!is.na(results$S_real)], 1)
+  final_i_real <- tail(results$I_real[!is.na(results$I_real)], 1)
+  
+  # Calculate infections saved if N was overridden
+  infections_saved <- if (!is.null(N_override)) N_override - nrow(dataset) else NA
+  
+  params <- data.frame(
+    Parameter = c("N", "Beta", "Initial S (Simulated)", "Initial I (Simulated)",
+                 "Final S (Simulated)", "Final I (Simulated)",
+                 "Initial S (Real)", "Initial I (Real)",
+                 "Final S (Real)", "Final I (Real)",
+                 "Simulated Duration (days)", "Simulated Peak", 
+                 "Simulated Peak Day", "Real Duration (days)", 
+                 "Real Peak", "Real Peak Day"),
+    Description = c(
+      "Total population size",
+      "Transmission rate (range: 0.1-3.0 per day)",
+      "Initial susceptible population (simulated)",
+      "Initial infected population (simulated)",
+      "Final susceptible population (simulated)",
+      "Final infected population (simulated)",
+      "Initial susceptible population (real)",
+      "Initial infected population (real)",
+      "Final susceptible population (real)",
+      "Final infected population (real)",
+      "Duration of epidemic (simulated)",
+      "Peak number of infected (simulated)",
+      "Day of peak infection (simulated)",
+      "Duration of epidemic (real)",
+      "Peak number of infected (real)",
+      "Day of peak infection (real)"
+    ),
+    Value = c(
+      as.character(N),
+      as.character(round(beta, 3)),
+      as.character(N - 1),
+      "1",
+      as.character(round(final_s_sim)),
+      as.character(round(final_i_sim)),
+      as.character(N),
+      "0",
+      as.character(round(final_s_real)),
+      as.character(round(final_i_real)),
+      as.character(duration_sim),
+      as.character(round(peak_value_sim)),
+      paste0("Day ", as.character(peak_day_sim)),
+      as.character(duration_real),
+      as.character(round(peak_value_real)),
+      paste0("Day ", as.character(peak_day_real))
+    )
+  )
+  
+  # add infections saved row if applicable
+  if (!is.na(infections_saved)) {
+    infections_row <- data.frame(
+      Parameter = "Total Infections Saved",
+      Description = "Estimated infections prevented compared to baseline",
+      Value = as.character(round(infections_saved))
+    )
+    params <- rbind(params, infections_row)
+  }
+  
+  custom_datatable(params)
+}
+
+real_sir_params_table <- function(dataset, beta, gamma, results, N_override = NULL) {
+  N <- if (!is.null(N_override)) N_override else nrow(dataset)
+  peak_day_sim <- results$time[which.max(results$I)]
+  peak_value_sim <- max(results$I, na.rm = TRUE)
+  duration_sim <- as.numeric(max(results$Date) - min(results$Date))
+  final_s_sim <- tail(results$S, 1)
+  final_i_sim <- tail(results$I, 1)
+  final_r_sim <- tail(results$R, 1)
+  
+  peak_day_real <- results$time[which.max(results$I_real)]
+  peak_value_real <- max(results$I_real, na.rm = TRUE)
+  duration_real <- as.numeric(max(results$Date[!is.na(results$I_real)]) - 
+                             min(results$Date[!is.na(results$I_real)]))
+  final_s_real <- tail(results$S_real[!is.na(results$S_real)], 1)
+  final_i_real <- tail(results$I_real[!is.na(results$I_real)], 1)
+  final_r_real <- tail(results$R_real[!is.na(results$R_real)], 1)
+  
+  # Calculate infections saved if N was overridden
+  infections_saved <- if (!is.null(N_override)) N_override - nrow(dataset) else NA
+  
+  params <- data.frame(
+    Parameter = c("N", "Beta", "Gamma", "R0", 
+                 "Initial S (Simulated)", "Initial I (Simulated)", "Initial R (Simulated)",
+                 "Final S (Simulated)", "Final I (Simulated)", "Final R (Simulated)",
+                 "Initial S (Real)", "Initial I (Real)", "Initial R (Real)",
+                 "Final S (Real)", "Final I (Real)", "Final R (Real)",
+                 "Simulated Duration (days)", "Simulated Peak", 
+                 "Simulated Peak Day",
+                 "Real Duration (days)", 
+                 "Real Peak", "Real Peak Day",
+                 "Infectious Period"),
+    Description = c(
+      "Total population size",
+      "Transmission rate (range: 0.1-3.0 per day)",
+      "Recovery rate (range: 0.05-0.5 per day)",
+      "Basic reproduction number (Beta/Gamma)",
+      "Initial susceptible population (simulated)",
+      "Initial infected population (simulated)",
+      "Initial recovered population (simulated)",
+      "Final susceptible population (simulated)",
+      "Final infected population (simulated)",
+      "Final recovered population (simulated)",
+      "Initial susceptible population (real)",
+      "Initial infected population (real)",
+      "Initial recovered population (real)",
+      "Final susceptible population (real)",
+      "Final infected population (real)",
+      "Final recovered population (real)",
+      "Duration of epidemic (simulated)",
+      "Peak number of infected (simulated)",
+      "Day of peak infection (simulated)",
+      "Duration of epidemic (real)",
+      "Peak number of infected (real)",
+      "Day of peak infection (real)",
+      "Average infectious period (1/Gamma)"
+    ),
+    Value = c(
+      as.character(N),
+      as.character(round(beta, 3)),
+      as.character(round(gamma, 3)),
+      as.character(round(beta/gamma, 3)),
+      as.character(N - 1),
+      "1",
+      "0",
+      as.character(round(final_s_sim)),
+      as.character(round(final_i_sim)),
+      as.character(round(final_r_sim)),
+      as.character(N),
+      "0",
+      "0",
+      as.character(round(final_s_real)),
+      as.character(round(final_i_real)),
+      as.character(round(final_r_real)),
+      as.character(duration_sim),
+      as.character(round(peak_value_sim)),
+      paste0("Day ", as.character(peak_day_sim)),
+      as.character(duration_real),
+      as.character(round(peak_value_real)),
+      paste0("Day ", as.character(peak_day_real)),
+      as.character(round(1/gamma, 1))
+    )
+  )
+  
+  # add infections saved row if applicable
+  if (!is.na(infections_saved)) {
+    infections_row <- data.frame(
+      Parameter = "Total Infections Saved",
+      Description = "Estimated infections prevented compared to baseline",
+      Value = as.character(round(infections_saved))
+    )
+    params <- rbind(params, infections_row)
+  }
+  
+  custom_datatable(params)
+}
+
+real_seir_params_table <- function(dataset, beta, sigma, gamma, results, N_override = NULL) {
+  N <- if (!is.null(N_override)) N_override else nrow(dataset)
+  peak_day_sim <- results$time[which.max(results$I)]
+  peak_value_sim <- max(results$I, na.rm = TRUE)
+  duration_sim <- as.numeric(max(results$Date) - min(results$Date))
+  final_s_sim <- tail(results$S, 1)
+  final_e_sim <- tail(results$E, 1)
+  final_i_sim <- tail(results$I, 1)
+  final_r_sim <- tail(results$R, 1)
+  
+  peak_day_real <- results$time[which.max(results$I_real)]
+  peak_value_real <- max(results$I_real, na.rm = TRUE)
+  duration_real <- as.numeric(max(results$Date[!is.na(results$I_real)]) - 
+                             min(results$Date[!is.na(results$I_real)]))
+  final_s_real <- tail(results$S_real[!is.na(results$S_real)], 1)
+  final_e_real <- tail(results$E_real[!is.na(results$E_real)], 1)
+  final_i_real <- tail(results$I_real[!is.na(results$I_real)], 1)
+  final_r_real <- tail(results$R_real[!is.na(results$R_real)], 1)
+  
+  incubation_days <- as.numeric(dataset$date_of_onset - dataset$date_of_exposure)
+  incubation_days <- incubation_days[!is.na(incubation_days)]
+  
+  # Calculate infections saved if N was overridden
+  infections_saved <- if (!is.null(N_override)) N_override - nrow(dataset) else NA
+  
+  params <- data.frame(
+    Parameter = c("N", "Beta", "Sigma", "Gamma", "R0", 
+                 "Initial S (Simulated)", "Initial E (Simulated)", "Initial I (Simulated)", "Initial R (Simulated)",
+                 "Final S (Simulated)", "Final E (Simulated)", "Final I (Simulated)", "Final R (Simulated)",
+                 "Initial S (Real)", "Initial E (Real)", "Initial I (Real)", "Initial R (Real)",
+                 "Final S (Real)", "Final E (Real)", "Final I (Real)", "Final R (Real)",
+                 "Incubation Period", "Infectious Period", "Simulated Duration (days)", 
+                 "Simulated Peak", "Simulated Peak Day",
+                 "Real Duration (days)", 
+                 "Real Peak", "Real Peak Day"),
+    Description = c(
+      "Total population size",
+      "Transmission rate (range: 0.1-3.0 per day)",
+      "Exposure rate (range: 0.1-1.0 per day)",
+      "Recovery rate (range: 0.05-0.5 per day)",
+      "Basic reproduction number (Beta/Gamma)",
+      "Initial susceptible population (simulated)",
+      "Initial exposed population (simulated)",
+      "Initial infected population (simulated)",
+      "Initial recovered population (simulated)",
+      "Final susceptible population (simulated)",
+      "Final exposed population (simulated)",
+      "Final infected population (simulated)",
+      "Final recovered population (simulated)",
+      "Initial susceptible population (real)",
+      "Initial exposed population (real)",
+      "Initial infected population (real)",
+      "Initial recovered population (real)",
+      "Final susceptible population (real)",
+      "Final exposed population (real)",
+      "Final infected population (real)",
+      "Final recovered population (real)",
+      "Time from exposure to onset (days)",
+      "Time from onset to recovery (days)",
+      "Duration of epidemic (simulated)",
+      "Peak number of infected (simulated)",
+      "Day of peak infection (simulated)", 
+      "Duration of epidemic (real)",
+      "Peak number of infected (real)",
+      "Day of peak infection (real)" 
+    ),
+    Value = c(
+      as.character(N),
+      as.character(round(beta, 3)),
+      as.character(round(sigma, 3)),
+      as.character(round(gamma, 3)),
+      as.character(round(beta/gamma, 3)),
+      as.character(N - 1),
+      "0",
+      "1",
+      "0",
+      as.character(round(final_s_sim)),
+      as.character(round(final_e_sim)),
+      as.character(round(final_i_sim)),
+      as.character(round(final_r_sim)),
+      as.character(N),
+      "0",
+      "0",
+      "0",
+      as.character(round(final_s_real)),
+      as.character(round(final_e_real)),
+      as.character(round(final_i_real)),
+      as.character(round(final_r_real)),
+      ifelse(length(incubation_days) > 0,
+             paste0("Mean: ", round(mean(incubation_days)), 
+                   " days (range ", min(incubation_days), "-", 
+                   max(incubation_days), ")"),
+             "Not available"),
+      as.character(round(1/gamma, 1)),
+      as.character(duration_sim),
+      as.character(round(peak_value_sim)),
+      paste0("Day ", as.character(peak_day_sim)),
+      as.character(duration_real),
+      as.character(round(peak_value_real)),
+      paste0("Day ", as.character(peak_day_real))
+    )
+  )
+  
+  # add infections saved row if applicable
+  if (!is.na(infections_saved)) {
+    infections_row <- data.frame(
+      Parameter = "Total Infections Saved",
+      Description = "Estimated infections prevented compared to baseline",
+      Value = as.character(round(infections_saved))
+    )
+    params <- rbind(params, infections_row)
+  }
+  
+  custom_datatable(params)
+}
+
+```
+
+
+```{r create-and-render-demographic-summary}
+
+create_demographic_summary <- function(df, var_name) {
+  if (var_name == "age_group") {
+    df <- df %>% mutate(age_group = as.numeric(as.character(age_group)))
+    summary_df <- df %>%
+      summarise(
+        N = n(),
+        Mean = round(mean(age_group, na.rm = TRUE), 2),
+        SD = round(sd(age_group, na.rm = TRUE), 2),
+        Median = median(age_group, na.rm = TRUE),
+        Min = min(age_group, na.rm = TRUE),
+        Max = max(age_group, na.rm = TRUE)
+      )
+  } else {
+    df <- df %>% mutate(!!var_name := as.factor(as.character(.data[[var_name]])))
+    summary_df <- df %>%
+      group_by(.data[[var_name]]) %>%
+      summarise(Count = n()) %>%
+      mutate(Percentage = Count / sum(Count)) %>%
+      rename(Category = 1)
+  }
+  return(summary_df)
+}
+
+render_demographic_table <- function(summary_df) {
+  if ("Mean" %in% names(summary_df)) {
+    datatable(
+      summary_df,
+      rownames = FALSE,
+      options = list(
+        dom = 't',
+        pageLength = nrow(summary_df)
+      )
+    ) %>%
+      formatStyle(
+        columns = 1:ncol(summary_df),
+        fontSize = '14px',
+        fontFamily = 'Tw Cen MT'
+      ) %>%
+      formatRound(columns = c("Mean", "SD"), digits = 2)
+  } else {
+    datatable(
+      summary_df,
+      rownames = FALSE,
+      options = list(
+        dom = 't',
+        pageLength = nrow(summary_df)
+      )
+    ) %>%
+      formatStyle(
+        columns = 1:ncol(summary_df),
+        fontSize = '14px',
+        fontFamily = 'Tw Cen MT'
+      ) %>%
+      formatPercentage('Percentage', 1)
+  }
+}
+
+```
+
+Explore Models {data-orientation=rows} 
+=====================================
+
+Sidebar {.sidebar data-width=350}
+-------------------------------------
+
+```{r}
+shinyWidgets::switchInput(
+  inputId = "simulation_only",
+  label = "Simulated Scenario Only",
+  value = TRUE,
+  onLabel = "On",
+  offLabel = "Off",
+  labelWidth = "75%"
+)
+
+conditionalPanel(
+  condition = "input.simulation_only == false",
+  fileInput("file1", "Choose CSV File",
+            multiple = FALSE,
+            accept = c("text/csv",
+                       "text/comma-separated-values,text/plain",
+                       ".csv"))
+)
+
+selectInput(inputId = "model", label = "Select Model",
+            choices = c("SI", "SIR", "SEIR"),
+            selected = "SI")
+
+# only show these inputs in simulation-only mode
+conditionalPanel(
+  condition = "input.simulation_only == true",
+  numericInput("N", "Total Population (N):", 100, min = 1, max = 100, step = 1),
+
+  conditionalPanel(
+    condition = "input.model == 'SI'",
+    numericInput("initial_S_si", "Initial Susceptible:", 99, min = 0, step = 1),
+    numericInput("initial_I_si", "Initial Infected:", 1, min = 0, step = 1)
+  ),
+
+  conditionalPanel(
+    condition = "input.model == 'SIR'",
+    numericInput("initial_S_sir", "Initial Susceptible:", 99, min = 0, step = 1),
+    numericInput("initial_I_sir", "Initial Infected:", 1, min = 0, step = 1),
+    numericInput("initial_R_sir", "Initial Recovered:", 0, min = 0, step = 1)
+  ),
+
+  conditionalPanel(
+    condition = "input.model == 'SEIR'",
+    numericInput("initial_S_seir", "Initial Susceptible:", 99, min = 0, step = 1),
+    numericInput("initial_E_seir", "Initial Exposed:", 0, min = 0, step = 1),
+    numericInput("initial_I_seir", "Initial Infected:", 1, min = 0, step = 1),
+    numericInput("initial_R_seir", "Initial Recovered:", 0, min = 0, step = 1)
+  ),
+
+  numericInput("days", "Simulation Duration (days):", 30, min = 1, step = 1)
+)
+
+# new slider for Total population input for real data mode
+conditionalPanel(
+  condition = "input.simulation_only == false",
+  checkboxInput("custom_N", "Optional: Input Total Population", FALSE),
+  conditionalPanel(
+    condition = "input.custom_N == true",
+    sliderInput("N_real", "Total Population (N)",
+                min = 10, max = 1000, value = 100, step = 1)
+  )
+)
+
+sliderInput("beta", "Transmission Rate (Beta, range: 0.1-3.0):", value = 0.3, min = 0.1, max = 3.0, step = 0.01, ticks = FALSE)
+
+conditionalPanel(
+  condition = "input.model == 'SEIR'",
+  sliderInput("sigma", "Exposure Rate (Sigma, range: 0.1-1.0):", value = 0.2, min = 0.1, max = 1.0, step = 0.01, ticks = FALSE)
+)
+
+conditionalPanel(
+  condition = "input.model == 'SIR' || input.model == 'SEIR'",
+  sliderInput("gamma", "Recovery Rate (Gamma, range: 0.05-0.5):", value = 0.1, min = 0.05, max = 0.5, step = 0.01, ticks = FALSE)
+)
+
+# only show R0 for SIR and SEIR models
+conditionalPanel(
+  condition = "input.model == 'SIR' || input.model == 'SEIR'",
+  div(style = "margin-bottom: 15px;",
+      p("Basic Reproduction Number (R₀):"),
+      verbatimTextOutput("R0_value", placeholder = TRUE)
+  )
+)
+
+hr()
+
+actionButton("run_model", "Run Model Simulation",
+             icon = icon("play"),
+             style = "color: #fff; background-color: #5c0b55; border-color: #5c0b55")
+
+hr()
+
+checkboxInput("separate_plots", "Show compartments separately", FALSE)
+
+# new check boxes for the defined CI levels
+conditionalPanel(
+  condition = "input.separate_plots == true && input.simulation_only == false",
+  selectInput("ci_type", "Show Confidence Intervals For:", 
+              choices = c("Both", "Real Only", "Simulated Only"), 
+              selected = "Both"),
+  checkboxInput("ci_95", "Show 95% CI", FALSE),
+  checkboxInput("ci_90", "Show 90% CI", FALSE),
+  checkboxInput("ci_75", "Show 75% CI", FALSE),
+  checkboxInput("ci_50", "Show 50% CI", FALSE)
+)
+
+conditionalPanel(
+  condition = "input.separate_plots == true",
+  selectInput("compartment", "Select Compartment",
+              choices = c("Susceptible" = "susceptible",
+                         "Infected" = "infected"),
+              selected = "susceptible")
+)
+
+# update compartment dropdown based on model selection
+observeEvent(input$model, {
+  choices <- if (input$model == "SI") {
+    c("Susceptible" = "susceptible", "Infected" = "infected")
+  } else if (input$model == "SIR") {
+    c("Susceptible" = "susceptible", "Infected" = "infected", "Recovered" = "recovered")
+  } else {
+    c("Susceptible" = "susceptible", "Exposed" = "exposed", "Infected" = "infected", "Recovered" = "recovered")
+  }
+  updateSelectInput(session, "compartment", choices = choices, selected = "susceptible")
+})
+
+hr()
+
+shinyWidgets::switchInput(
+  inputId = "demographics",
+  label = "Demographics",
+  value = FALSE,
+  onLabel = "On",
+  offLabel = "Off"
+)
+
+hr()
+
+conditionalPanel(
+  condition = "input.demographics == true && input.simulation_only == false",
+  selectizeInput("demo_vars", "Select Demographic Variables:",
+                 choices = NULL,
+                 multiple = FALSE,
+                 selected = NULL)
+)
+
+hr()
+
+downloadButton("download_manual", "Download User Manual",
+               style = "color: #fff; background-color: #5c0b55; border-color: #5c0b55")
+
+hr()
+
+renderValueBox({
+  data <- read.csv("mock_data-2025-06-13.csv")
+
+  output$downloadData <- downloadHandler(
+    filename = function() {
+      paste0("mock_data-", Sys.Date(), ".csv")
+    },
+    content = function(file) {
+      write.csv(data, file)
+    }
+  )
+
+  flexdashboard::valueBox(value = downloadButton("downloadData", "Download Mock Data",
+                                                icon = shiny::icon("download")))
+})
+
+renderImage({
+  pfad <- "one_logo.png"
+  list(
+    src = pfad,
+    contentType = 'image/png',
+    width = 210,
+    height = 60,
+    style = "position: fixed; bottom: 10px; left: 10px; cursor: pointer;",
+    onclick = "window.location.href = 'http://onehealth.or.kr/    ';"
+  )
+}, deleteFile = FALSE)
+
+output$download_manual <- downloadHandler(
+  filename = "SEIRify_User_Manual.pdf",
+  content = function(file) {
+    file.copy("SEIRify_User_Manual.pdf", file)
+  }
+)
+
+# R0 value display
+output$R0_value <- renderText({
+  if (input$model %in% c("SIR", "SEIR")) {
+    req(input$beta, input$gamma)
+    round(input$beta / input$gamma, 2)
+  }
+})
+
+```
+
+
+```{r app-observers}
+useShinyjs()
+
+observeEvent(list(
+  input$model, input$N, input$days, input$simulation_only, input$custom_N, input$N_real,
+  input$beta, input$sigma, input$gamma,
+  input$initial_S_si, input$initial_I_si,
+  input$initial_S_sir, input$initial_I_sir, input$initial_R_sir,
+  input$initial_S_seir, input$initial_E_seir, input$initial_I_seir, input$initial_R_seir,
+  input$file1
+), {
+  params_changed(TRUE)
+})
+
+observe({
+  req(input$model)
+  
+  current_N <- if (simulation_only()) {
+    input$N
+  } else {
+    if (!is.null(dataset()) && input$custom_N) {
+      input$N_real
+    } else if (!is.null(dataset())) {
+      nrow(dataset())
+    } else {
+      return()
+    }
+  }
+  
+  req(current_N, is.numeric(current_N))
+  
+  if (input$model == "SI") {
+    updateNumericInput(session, "initial_S_si", value = current_N - 1)
+    updateNumericInput(session, "initial_I_si", value = 1)
+  } else if (input$model == "SIR") {
+    updateNumericInput(session, "initial_S_sir", value = current_N - 1)
+    updateNumericInput(session, "initial_I_sir", value = 1)
+    updateNumericInput(session, "initial_R_sir", value = 0)
+  } else if (input$model == "SEIR") {
+    updateNumericInput(session, "initial_S_seir", value = current_N - 1)
+    updateNumericInput(session, "initial_E_seir", value = 0)
+    updateNumericInput(session, "initial_I_seir", value = 1)
+    updateNumericInput(session, "initial_R_seir", value = 0)
+  }
+})
+
+observe({
+  req(input$custom_N, input$N_real, !simulation_only(), dataset())
+  
+  req_n <- nrow(dataset()) + 1
+  current_n <- input$N_real
+  
+  if (current_n < req_n) {
+    shinyjs::disable("run_model")
+    showNotification(
+      paste0("Your file contains ", nrow(dataset()), " cases; choose N ≥ ", req_n),
+      type = "error",
+      duration = 10
+    )
+  } else {
+    shinyjs::enable("run_model")
+  }
+})
+
+observeEvent(dataset(), {
+  if (!is.null(dataset()) && !simulation_only()) {
+    updateSliderInput(session, "N_real", value = nrow(dataset()))
+  }
+})
+
+observeEvent(input$run_model, {
+  withProgress(message = 'Running model...', value = 0, {
+    params_changed(FALSE)
+
+    tryCatch({
+      req(input$model)
+
+      run_clicked(TRUE)
+
+      if (simulation_only()) {
+        req(input$N)
+        current_N <- input$N
+        N_override <- NULL
+      } else {
+        req(dataset())
+        if (input$custom_N) {
+          req(input$N_real)
+          current_N <- input$N_real
+          N_override <- current_N
+        } else {
+          current_N <- nrow(dataset())
+          N_override <- NULL
+        }
+      }
+
+      current_S <- if (input$model == "SI") input$initial_S_si else
+                  if (input$model == "SIR") input$initial_S_sir else
+                  input$initial_S_seir
+
+      current_I <- if (input$model == "SI") input$initial_I_si else
+                  if (input$model == "SIR") input$initial_I_sir else
+                  input$initial_I_seir
+
+      current_E <- if (input$model %in% c("SI", "SIR")) 0 else input$initial_E_seir
+      current_R <- if (input$model == "SI") 0 else
+                  if (input$model == "SIR") input$initial_R_sir else
+                  input$initial_R_seir
+
+      sum_compartments <- current_S + current_I + current_E + current_R
+
+      if (sum_compartments != current_N) {
+        showNotification(
+          paste("Error: Initial compartments must sum to N (", current_N,
+                "). Current sum: ", sum_compartments,
+                ". Resetting to defaults (i.e. S = N - 1, I = 1 , E = 0, R = 0)."),
+          type = "error",
+          duration = 10
+        )
+
+        if (input$model == "SI") {
+          updateNumericInput(session, "initial_S_si", value = current_N - 1)
+          updateNumericInput(session, "initial_I_si", value = 1)
+        } else if (input$model == "SIR") {
+          updateNumericInput(session, "initial_S_sir", value = current_N - 1)
+          updateNumericInput(session, "initial_I_sir", value = 1)
+          updateNumericInput(session, "initial_R_sir", value = 0)
+        } else if (input$model == "SEIR") {
+          updateNumericInput(session, "initial_S_seir", value = current_N - 1)
+          updateNumericInput(session, "initial_E_seir", value = 0)
+          updateNumericInput(session, "initial_I_seir", value = 1)
+          updateNumericInput(session, "initial_R_seir", value = 0)
+        }
+        
+        return()
+      }
+
+      shinyjs::removeClass(id = if (input$model == "SI") "initial_S_si" else
+                          if (input$model == "SIR") "initial_S_sir" else "initial_S_seir",
+                          class = "error-highlight")
+      shinyjs::removeClass(id = if (input$model == "SI") "initial_I_si" else
+                          if (input$model == "SIR") "initial_I_sir" else "initial_I_seir",
+                          class = "error-highlight")
+      if (input$model == "SIR") {
+        shinyjs::removeClass("initial_R_sir", "error-highlight")
+      } else if (input$model == "SEIR") {
+        shinyjs::removeClass("initial_E_seir", "error-highlight")
+        shinyjs::removeClass("initial_R_seir", "error-highlight")
+      }
+
+      req(input$beta)
+
+      if (simulation_only()) {
+        req(input$days)
+      }
+
+      if (input$model == "SEIR") {
+        req(input$sigma, input$gamma)
+      }
+
+      if (input$model == "SIR") {
+        req(input$gamma)
+      }
+
+      incProgress(0.3, detail = "Computing model...")
+
+      if (simulation_only()) {
+        if (input$model == "SI") {
+          results <- run_si_model(current_N, input$beta, input$days,
+                                current_S, current_I)
+        } else if (input$model == "SIR") {
+          results <- run_sir_model(current_N, input$beta, input$gamma, input$days,
+                                 current_S, current_I, current_R)
+        } else if (input$model == "SEIR") {
+          results <- run_seir_model(current_N, input$beta, input$sigma, input$gamma, input$days,
+                                  current_S, current_E, current_I, current_R)
+        }
+        bootstrap_results(NULL)
+        real_data_ci(NULL)
+      } else {
+        req(dataset())
+        df <- dataset()
+
+        if (input$model == "SI") {
+          results <- run_real_model(df, "SI", input$beta, N_override = N_override)
+        } else if (input$model == "SIR") {
+          results <- run_real_model(df, "SIR", input$beta, gamma = input$gamma, N_override = N_override)
+        } else if (input$model == "SEIR") {
+          results <- run_real_model(df, "SEIR", input$beta, input$sigma, input$gamma, N_override = N_override)
+        }
+        
+        incProgress(0.3, detail = "Computing confidence intervals...")
+
+        tryCatch({
+          if (input$model == "SI") {
+            bootstrap_ci <- run_bayesian_bootstrap_ci(df, "SI", input$beta, 
+                                                     sigma = NULL, 
+                                                     gamma = NULL,
+                                                     n_boot = 10,
+                                                     N_override = N_override)
+          } else if (input$model == "SIR") {
+            bootstrap_ci <- run_bayesian_bootstrap_ci(df, "SIR", input$beta, 
+                                                     sigma = NULL,
+                                                     gamma = input$gamma,
+                                                     n_boot = 10,
+                                                     N_override = N_override)
+          } else if (input$model == "SEIR") {
+            bootstrap_ci <- run_bayesian_bootstrap_ci(df, "SEIR", input$beta, 
+                                                     sigma = input$sigma,
+                                                     gamma = input$gamma,
+                                                     n_boot = 10,
+                                                     N_override = N_override)
+          }
+          bootstrap_results(bootstrap_ci)
+        }, error = function(e) {
+          showNotification(
+            paste("Error running Bayesian bootstrap for simulated data: ", e$message),
+            type = "warning",
+            duration = 10
+          )
+          bootstrap_results(NULL)
+        })
+        
+        tryCatch({
+          if (input$model == "SI") {
+            real_ci <- run_real_data_ci(df, input$model, n_boot = 10, N_override = N_override)
+          } else {
+            real_ci <- run_real_data_ci(df, input$model, n_boot = 10, N_override = N_override, gamma = input$gamma)
+          }
+          if (!is.null(real_ci)) {
+            real_data_ci(real_ci)
+          } else {
+            real_data_ci(NULL)
+            showNotification("Could not generate confidence intervals for real data. Check if your dataset has valid date columns.", type = "warning", duration = 10)
+          }
+        }, error = function(e) {
+          real_data_ci(NULL)
+          showNotification(paste("Error generating real data CI:", e$message), type = "warning", duration = 10)
+        })
+      }
+
+      if (!is.null(results)) {
+        model_results(results)
+        current_model(input$model)
+      }
+    }, error = function(e) {
+      showNotification(
+        paste("Error running model: Confirm that all parameters are properly set", e$message),
+        type = "error",
+        duration = 10
+      )
+    })
+  })
+})
+
+observeEvent(input$simulation_only, {
+  previous_mode(simulation_only())
+  simulation_only(input$simulation_only)
+  run_clicked(FALSE)
+  bootstrap_results(NULL)
+  if (!input$simulation_only && is.null(input$file1)) {
+    showNotification("Please upload a dataset when comparing with real data", type = "message", duration = 10)
+  }
+})
+
+```
+
+
+```{r get-demo-cols}
+observe({
+  req(dataset())
+  df <- dataset()
+  
+  # get all column names
+  all_cols <- names(df)
+  
+  # exclude unwanted columns like columns containing 'date' and columns named 'id' or 'x1'
+  demo_cols <- all_cols[!grepl("date", all_cols, ignore.case = TRUE) & 
+                        !tolower(all_cols) %in% c("id", "x1", "v1")]
+  
+  # update the selectize input
+  updateSelectizeInput(session, "demo_vars", 
+                      choices = sort(demo_cols),
+                      selected = ifelse("sex" %in% demo_cols, "sex", demo_cols[1]))
+})
+
+```
+
+Row {.tabset .tabset-fade data-height=550}
+-------------------------------------------
+
+### Model Visualization
+
+```{r render-model-viz}
+
+model_results <- reactiveVal(NULL)
+current_model <- reactiveVal(NULL)
+separate_plots <- reactiveVal(FALSE)
+simulation_only <- reactiveVal(TRUE)
+
+# initialize with proper values
+observe({
+  separate_plots(isolate(input$separate_plots))
+  simulation_only(isolate(input$simulation_only))
+})
+
+# New: Reactive for CI settings
+ci_settings <- reactive({
+  list(
+    ci_95 = input$ci_95,
+    ci_90 = input$ci_90,
+    ci_75 = input$ci_75,
+    ci_50 = input$ci_50
+  )
+})
+
+# render combined plot
+output$model_viz <- renderHighchart({
+  req(model_results(), current_model(), !params_changed())
+  
+  results <- model_results()
+  
+  if (current_model() == "SI") {
+    si_viz(results, separate = FALSE, simulation_only = simulation_only())
+  } else if (current_model() == "SIR") {
+    sir_viz(results, separate = FALSE, simulation_only = simulation_only())
+  } else if (current_model() == "SEIR") {
+    seir_viz(results, separate = FALSE, simulation_only = simulation_only())
+  }
+})
+
+
+output$compartment_plot <- renderHighchart({
+  req(model_results(), current_model(), input$separate_plots, input$compartment, !params_changed())
+  
+  results <- model_results()
+  
+  compartment_viz(
+    results = results,
+    compartment = input$compartment,
+    simulation_only = simulation_only(),
+    bootstrap_ci = if (!simulation_only()) bootstrap_results() else NULL,
+    real_data_ci = if (!simulation_only()) real_data_ci() else NULL,
+    show_ci = ci_settings()
+  )
+})
+
+# update separate_plots reactive value without recomputing model
+observeEvent(input$separate_plots, {
+  if (!is.null(model_results()) && !is.null(current_model()) && current_model() == input$model) {
+    separate_plots(input$separate_plots)
+  }
+})
+
+# renderUI
+renderUI({
+  # Check if mode has changed by comparing current and previous simulation_only state
+  mode_changed <- !is.null(previous_mode()) && previous_mode() != simulation_only()
+  
+  if (is.null(model_results()) || is.null(current_model()) || !run_clicked()) {
+    if (mode_changed) {
+      if (simulation_only()) {
+        return(div(
+          p("Welcome to Simulated Only mode! Adjust parameters and click 'Run Model Simulation' to visualize results.",
+            style = "font-family: 'Tw Cen MT'; font-size: 18px; text-align: center;")
+        ))
+      } else {
+        return(div(
+          p("Welcome to Real vs Simulated mode! Upload a dataset, adjust parameters, and click 'Run Model Simulation' to compare results.",
+            style = "font-family: 'Tw Cen MT'; font-size: 18px; text-align: center;")
+        ))
+      }
+    } else {
+      return(div(
+        p("Welcome to SEIRify! Choose 'Simulated Scenario Only' mode (toggle on) or 'Real vs. Simulated' mode (toggle off, upload a dataset). Pick a model, set parameters, and click 'Run Model Simulation' to see results.",
+          style = "font-family: 'Tw Cen MT'; font-size: 18px; text-align: center;")
+      ))
+    }
+  } else if (params_changed()) {
+    return(div(
+      p("Parameters updated. Click 'Run Model Simulation' to view new results.",
+        style = "font-family: 'Tw Cen MT'; font-size: 18px; text-align: center;")
+    ))
+  }
+  
+  if (input$separate_plots) {
+    div(
+      style = "height: 450px; width: 100%;",
+      highchartOutput("compartment_plot")
+    )
+  } else {
+    highchartOutput("model_viz")
+  }
+})
+
+```
+
+Row {.tabset .tabset-fade data-height=350}
+--------------------------------------------
+
+### Model Parameters
+
+```{r render-params-table}
+
+output$params_table <- renderDT({
+  req(run_clicked(), model_results(), current_model(), !params_changed())
+  
+  results <- model_results()
+  
+  if (simulation_only()) {
+    if (current_model() == "SI") {
+      si_params_table(input$N, input$beta, input$days, results)
+    } else if (current_model() == "SIR") {
+      sir_params_table(input$N, input$beta, input$gamma, input$days, results)
+    } else if (current_model() == "SEIR") {
+      seir_params_table(input$N, input$beta, input$sigma, input$gamma, input$days, results)
+    }
+  } else {
+    req(dataset())
+    df <- dataset()
+    
+    # Get N value for real data mode
+    N_val <- if (input$custom_N) input$N_real else NULL
+    
+    if (current_model() == "SI") {
+      real_si_params_table(df, input$beta, results, N_override = N_val)
+    } else if (current_model() == "SIR") {
+      real_sir_params_table(df, input$beta, input$gamma, results, N_override = N_val)
+    } else if (current_model() == "SEIR") {
+      real_seir_params_table(df, input$beta, input$sigma, input$gamma, results, N_override = N_val)
+    }
+  }
+})
+
+renderUI({
+  if (!run_clicked()) {
+    p("...",
+      style = "font-family: 'Tw Cen MT'; font-size: 18px; text-align: center;")
+  } else if (params_changed()) {
+    p("Parameters updated. Click 'Run Model Simulation' to view new results.",
+      style = "font-family: 'Tw Cen MT'; font-size: 18px; text-align: center;")
+  } else {
+    DTOutput("params_table")
+  }
+})
+
+```
+
+### Comparison
+
+```{r render-comparison-table}
+
+output$comparison_table <- renderDT({
+  req(run_clicked(), model_results(), current_model(), dataset(), !simulation_only(), !params_changed())
+  
+  df <- dataset()
+  
+  if (current_model() == "SI") {
+    comp <- bootstrap_comparison(df, "SI", input$beta, n_boot = 10)
+  } else if (current_model() == "SIR") {
+    comp <- bootstrap_comparison(df, "SIR", input$beta, gamma = input$gamma, n_boot = 10)
+  } else if (current_model() == "SEIR") {
+    comp <- bootstrap_comparison(df, "SEIR", input$beta, input$sigma, input$gamma, n_boot = 10)
+  }
+  
+  datatable(
+    comp,
+    rownames = FALSE,
+    options = list(
+      dom = 'Brt',
+      buttons = c('csv','excel', 'pdf'),
+      pageLength = nrow(comp)
+    )
+  ) %>%
+    formatStyle(
+      columns = 1:ncol(comp),
+      fontSize = '14px',
+      fontFamily = 'Tw Cen MT'
+    ) %>%
+    formatStyle(
+      columns = 1:ncol(comp),
+      target = 'row',
+      borderBottom = '1px solid #ddd'
+    ) %>%
+    formatStyle(
+      columns = 1:ncol(comp),
+      backgroundColor = 'white'
+    ) %>%
+    formatStyle(
+      'Metric',
+      fontWeight = 'bold'
+    ) %>%
+    formatRound(columns = c("Estimate", "Lower_CI", "Upper_CI"), digits = 0)
+})
+
+renderUI({
+  if (!run_clicked()) {
+    p("...",
+      style = "font-family: 'Tw Cen MT'; font-size: 18px; text-align: center;")
+  } else if (params_changed()) {
+    p("Parameters updated. Click 'Run Model Simulation' to view new results.",
+      style = "font-family: 'Tw Cen MT'; font-size: 18px; text-align: center;")
+  } else if (simulation_only()) {
+    p("Comparison metrics are only available when comparing simulated and real scenarios.",
+      style = "font-family: 'Tw Cen MT'; font-size: 18px; text-align: center;")
+  } else {
+    DTOutput("comparison_table")
+  }
+})
+
+```
+
+### Demographics
+
+```{r demo-analysis}
+output$demographic_tables <- renderUI({
+  req(input$demographics, !simulation_only(), input$demo_vars, dataset())
+  
+  df <- dataset() %>% 
+    janitor::clean_names()
+
+  
+  tables <- lapply(input$demo_vars, function(var) {
+    summary_df <- create_demographic_summary(df, var)
+    tagList(
+      h4(toupper(var), style = "font-family: 'Tw Cen MT'; fontWeight: bold;"),
+      render_demographic_table(summary_df),
+      br()
+    )
+  })
+  
+  tagList(tables)
+})
+
+renderUI({
+  if (input$demographics && !simulation_only()) {
+    uiOutput("demographic_tables")
+  } else if (input$demographics && simulation_only()) {
+    p("Demographics are only available when using real data.",
+      style = "font-family: 'Tw Cen MT'; font-size: 18px; text-align: center;")
+  } else {
+    p("Demographics analysis is turned off. Toggle the switch in the sidebar to enable.", 
+      style = "font-family: 'Tw Cen MT'; font-size: 18px; text-align: center;")
+  }
+})
+
+```
+
+About
+=============
+
+```{r about-page}
+div(
+  h2("About SEIRify: Epidemic Modeling Dashboard"),
+  p("SEIRify is an interactive modeling tool that helps public health professionals and researchers analyze disease transmission patterns using compartmental models."),
+  h3("Features:"),
+  tags$ul(
+    tags$li("Three model types: SI, SIR, and SEIR"),
+    tags$li("Interactive visualizations of disease spread (simulated or real vs simulated)"),
+    tags$li("Demographic analysis of cases (when using real data)"),
+    tags$li("Comparison of simulated vs real scenarios"),
+    tags$li("Detailed model parameters and statistics"),
+    tags$li("Downloadable results and parameters")
+  ),
+  h3("How to Use:"),
+  p("1. Select whether you want to run a simulated scenario only or compare with real data"),
+  p("2. If comparing with real data, upload your dataset in CSV format"),
+  p("3. Select the appropriate model type"),
+  p("4. Adjust model parameters (Beta, Sigma, Gamma) as needed"),
+  p("5. Click 'RUN MODEL SIMULATION' to generate results"),
+  p("6. Explore the visualizations, parameter tables, and comparison metrics"),
+  h3("Contact:"),
+  p("For questions or support, please contact our team at xyz@abc.com")
+)
+
+```
