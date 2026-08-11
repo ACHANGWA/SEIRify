@@ -207,8 +207,39 @@ Table 1.Simulated only model parameters
 | **Infectious Period** | Average infectious period (1/Gamma) | 4.2 |
 
 
+# Case study 2: Real versus Simulated Scenario with COVID-19
 
+To demonstrate the real versus simulated functionality of SEIRify, we used a linelist of de-identified COVID-19 data. The dataset contains 10 variables: ID, date_of_onset, date_of_exposure, regions, Vaccine_status, type, country, Transmission.type, Age.group, and sex. This tutorial dataset is publicly available at ….
 
+To begin the analysis, the “Simulated Scenario Only” option was switched off, enabling the real versus simulated scenario mode. The de-identified dataset was then uploaded, and the model of interest was selected for comparison. For this example, a total population of 330 was specified to represent the size of the community under study, allowing estimation of both infected and uninfected individuals during the course of the epidemic.
+
+<img width="388" height="445" alt="image" src="https://github.com/user-attachments/assets/cc283f4b-2795-4796-b85a-8c3ac7f1d2dc" />
+
+Figure 14. A screenshot of the model setup page showing the real versus simulated scenario mode, dataset upload, SEIR model selection, and specification of the total population size.
+
+The model parameters were specified as follows: a transmission rate (β) of 2.0 per contact per unit time, an exposure rate (σ) of 0.21, corresponding to an average incubation period of approximately 5 days, and a recovery rate (γ) of 0.20, corresponding to an average infectious period of 5 days. These parameter values fall within the plausible ranges for COVID-19 transmission dynamics as reported in the empirical literature [ref].
+<img width="642" height="489" alt="image" src="https://github.com/user-attachments/assets/a778faa8-d68b-49c1-b4f7-f60ee58f6327" />
+
+Figure 15. Screenshot of the real versus simulated model parameters
+
+# The outputs
+# Visualizations
+
+After selecting the “show compartment separately” option, we visualized each compartment for both the real and simulated scenarios side by side. To focus on the stability of the model estimates, we selected the confidence intervals for the simulated scenario only. Visual plots for each compartment, downloaded directly from SEIRify, are presented below.
+
+# The Susceptible (S) compartment 
+
+The susceptible population declined over time in both the simulated and real scenarios. In the simulated scenario, the susceptible curve showed a rapid decline, with most individuals transitioning out of susceptibility by day 15. However, the real data reflected a more gradual decline, with a sizeable number of individuals remaining susceptible beyond day 30.
+<img width="975" height="650" alt="image" src="https://github.com/user-attachments/assets/da47d9b0-9b35-445a-82db-a671e189416d" />
+
+Figure 16. Output for the real versus simulated scenario S compartment
+
+# The Exposed (E) compartment 
+
+The exposed population showed distinct patterns between the simulated and real data scenarios. In the simulated outbreak, the number of exposed individuals rose sharply, peaking around day 12 with approximately 140 cases before declining. In contrast, the real data reflected a much smaller and flatter exposed curve, with the maximum number of exposed individuals remaining below 30 and distributed over a longer period.
+
+<img width="692" height="461" alt="image" src="https://github.com/user-attachments/assets/0b5e22d2-7d78-45de-906f-dbb16ac07f9e" />
+Figure 17. Output for the real versus simulated scenario E compartment
 
 
 
