@@ -17,6 +17,13 @@ The Explore models page serves as the starting point for using the SEIRify dashb
 The Comparison window provides model outputs of the real versus simulated scenarios. These include key epidemiological metrics, such as the reduction in total infections, the reduction in outbreak duration (in days), the reduction in peak size, the delayed epidemic start (in days), and the delay in the timing of the peak (in days). For each metric, the window displays the point estimate along with its 95% confidence interval (CI).
 <img width="975" height="489" alt="image" src="https://github.com/user-attachments/assets/1a241a87-7f25-433e-817b-f8583ebd5529" />
 Figure 1. A screenshot of the Explore models page after initially loading the dashboard.
+Users primarily interact with the dashboard’s sidebars, where details related to the population, scenario specifications, and all model parameters must be entered. Once selected, the user can then click “Run model simulation” to obtain the output. The SEIRify dashboard was developed using R-Shiny. 
+The Demographics window shows a summary of all the variables of the uploaded dataset. Numeric variables are summarized as means and standard deviations, while categorical variables are presented as counts and percentages. 
+<img width="975" height="149" alt="image" src="https://github.com/user-attachments/assets/95c01f7f-068d-4f28-b864-ec7f9c7beb97" />
+Figure 2. A screenshot of the Demographics tab 
+
+# The scenarios
+
 
 
 
