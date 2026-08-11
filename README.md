@@ -67,6 +67,7 @@ Figure 6. Screenshot showing selection of the ‘show compartment separately’ 
 In SEIRify, users are required to specify the total population (N) for which the simulation will be performed. Once this value is entered, the system automatically adjusts the counts for the initial susceptible and initial infected populations according to the user’s input. This setup reflects the epidemiological principle that an outbreak typically begins with an index case and subsequently spreads to susceptible individuals in the community. Users must also provide the simulation duration (days), which determines the time horizon of the epidemic projection in the simulated scenario. For the real versus simulated scenario, however, the epidemic duration is determined by the range of dates present in the uploaded dataset. An additional optional input allows users to define the total population size in the real versus simulated scenario, enabling estimation of the uninfected population as the difference between the total community population and the number of infected individuals recorded in the uploaded dataset.
 
 <img width="387" height="588" alt="image" src="https://github.com/user-attachments/assets/1eec29cf-fec7-4b95-8d1e-9105d82f5a68" />
+
 Figure 7. A screenshot of the population input fields showing the initial conditions and simulation duration for the outbreak model
 
 
@@ -83,3 +84,14 @@ SEIRify provides multiple options for accessing and exporting model outputs. Vis
 
 To ensure broad accessibility, SEIRify was developed as a web-based application that can be accessed through a standard internet browser without the need for specialized software installation. The framework was built on RStudio Shiny. The epidemic models were implemented as R scripts, with each model encapsulated in a dedicated R function and invoked by the server-side script (server.R) of the Shiny application. This design maintained a clear separation between the user interface and computational components, allowing model code to be modified independently of the application interface.  The SEIRify application was developed using several packages to support its functionality. The shiny, shinyWidgets, and shinyjs packages provide the core framework for building the interactive dashboard and extending functionality. flexdashboard was used to structure the user interface, while highcharter supported interactive visualizations, complementing the built-in plotting features. For epidemiological modeling, deSolve was employed to solve systems of ordinary differential equations, and EpiEstim was used for estimating time-varying reproduction numbers. Data cleaning and management were facilitated by tidyverse, tidyr, data.table, and janitor, with DT enabling interactive tabular displays. lubridate was used for handling dates and times, which are central to epidemic datasets. Font management and customization of visual outputs were achieved through extrafont, extrafontdb, systemfonts, and sysfonts. 
 Below are the epidemiological parameters for some selected infectious diseases. These parameters can be used for both the simulated scenario only and the real versus simulated scenario.
+
+Parameter	Infectious Disease
+	COVID-19	Influenza A	Measles	Pertussis	Ebola	mpox
+Transmission rate per day-β	Wild
+0.21 – 0.28 
+
+Omicron
+1.14 – 2.0 	1.8	1.7 – 2.6	0.2-0.5	0.2 to 0.3	0.01 to 0.1 
+Exposure rate – σ (1/Incubation Period)	0.21 (1 / 4.6 days)	0.5 (1/2 days) 	0.08 (1/13 days)	1/7 – 1/10	1/2 – 1/21	1/10
+Recovery rate – γ (1/duration of infectiousness)	0.1 – 0.2 
+(≈ 1 / 5 – 10 days)	0.2 (1/5days)	0.1 – 0.14 (1/7 – 10 days)	0.071	1/6 – 1/16	0.05
