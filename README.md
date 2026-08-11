@@ -131,3 +131,17 @@ Below are the epidemiological parameters for some selected infectious diseases. 
   </tbody>
 </table>
 
+# Case study 1: Simulated Scenario ONLY - Influenza A 
+
+To demonstrate the simulated functionality of SEIRify, we modeled an influenza A outbreak in a hypothetical community of 100 individuals over a 30-day period using the SEIR compartmental model. At the start of the simulation, the population was initialized with 99 susceptible, 1 infected, 0 exposed, and 0 recovered individuals, reflecting the introduction of a single index case into an otherwise susceptible population. 
+
+<img width="466" height="864" alt="image" src="https://github.com/user-attachments/assets/d14bdbd3-b77b-448e-aa4d-ac04141064d2" />
+Figure 8. Screenshot showing initial input of population parameters
+
+The model parameters were specified as follows: transmission rate (β) of 1.8 per contact per unit time, exposure rate (σ) of 0.5 (corresponding to an average incubation period of 2 days), and recovery rate (γ) of 0.24 (corresponding to an average infectious period of approximately 4 days). These parameter values represent plausible ranges for influenza A transmission dynamics as published in the empirical literature [].
+
+<img width="623" height="500" alt="image" src="https://github.com/user-attachments/assets/2c796078-fd2c-4602-9095-39bcbb925b85" />
+Figure 9. Screenshot showing initial input of transmission parameters
+
+# 
+
