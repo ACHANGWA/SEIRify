@@ -11,6 +11,12 @@ To install and run the shiny app locally on your computer you will need to first
 
 Upon initially loading the application, users will see the “About” icon at the top right side of the application. This page provides an overview of the methods employed within the dashboard, including model specification, forecasting, and details of the available evaluation statistics. 
 
+# Explore model's page
+
+The Explore models page serves as the starting point for using the SEIRify dashboard (Figure 1), including specifying the scenario of interest (Simulated Scenario Only versus Simulated and Real Scenario compared), compartmental model type (SI, SIR, and SEIR), inputting disease parameters based on selected models (transmission rate, exposure rate and recovery rate) and inputting the population parameters (Total population, initial susceptible, exposed, infected and recovered). After selecting all necessary options and clicking the “Run model simulation” button, the resulting models fit and display the appropriate model visualizations and model parameters on this page. Note that each time any input is changed, the “Run model simulation” button has to be clicked again. Note that if options have not been specified and processed, the dashboard will remain blank (Figure 1). The model parameter window displays the key inputs and estimated parameters used in the simulation, allowing users to verify the correctness of the model setup.
+The Comparison window provides model outputs of the real versus simulated scenarios. These include key epidemiological metrics, such as the reduction in total infections, the reduction in outbreak duration (in days), the reduction in peak size, the delayed epidemic start (in days), and the delay in the timing of the peak (in days). For each metric, the window displays the point estimate along with its 95% confidence interval (CI).
+<img width="975" height="489" alt="image" src="https://github.com/user-attachments/assets/1a241a87-7f25-433e-817b-f8583ebd5529" />
+Figure 1. A screenshot of the Explore models page after initially loading the dashboard.
 
 
 
