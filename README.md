@@ -85,9 +85,48 @@ SEIRify provides multiple options for accessing and exporting model outputs. Vis
 To ensure broad accessibility, SEIRify was developed as a web-based application that can be accessed through a standard internet browser without the need for specialized software installation. The framework was built on RStudio Shiny. The epidemic models were implemented as R scripts, with each model encapsulated in a dedicated R function and invoked by the server-side script (server.R) of the Shiny application. This design maintained a clear separation between the user interface and computational components, allowing model code to be modified independently of the application interface.  The SEIRify application was developed using several packages to support its functionality. The shiny, shinyWidgets, and shinyjs packages provide the core framework for building the interactive dashboard and extending functionality. flexdashboard was used to structure the user interface, while highcharter supported interactive visualizations, complementing the built-in plotting features. For epidemiological modeling, deSolve was employed to solve systems of ordinary differential equations, and EpiEstim was used for estimating time-varying reproduction numbers. Data cleaning and management were facilitated by tidyverse, tidyr, data.table, and janitor, with DT enabling interactive tabular displays. lubridate was used for handling dates and times, which are central to epidemic datasets. Font management and customization of visual outputs were achieved through extrafont, extrafontdb, systemfonts, and sysfonts. 
 Below are the epidemiological parameters for some selected infectious diseases. These parameters can be used for both the simulated scenario only and the real versus simulated scenario.
 
-| Parameter | COVID-19 | Influenza A | Measles | Pertussis | Ebola | mpox |
-|---|---|---|---|---|---|---|
-| **Infectious Disease** | COVID-19 | Influenza A | Measles | Pertussis | Ebola | mpox |
-| **Transmission rate per day – β** | Wild: 0.21–0.28<br>Omicron: 1.14–2.0 | 1.8 | 1.7–2.6 | 0.2–0.5 | 0.2 to 0.3 | 0.01 to 0.1 |
-| **Exposure rate – σ (1/Incubation Period)** | 0.21 (1/4.6 days) | 0.5 (1/2 days) | 0.08 (1/13 days) | 1/7–1/10 | 1/2–1/21 | 1/10 |
-| **Recovery rate – γ (1/duration of infectiousness)** | 0.1–0.2 (≈ 1/5–10 days) | 0.2 (1/5 days) | 0.1–0.14 (1/7–10 days) | 0.071 | 1/6–1/16 | 0.05 |
+<table>
+  <thead>
+    <tr>
+      <th rowspan="2">Parameter</th>
+      <th colspan="6">Infectious Disease</th>
+    </tr>
+    <tr>
+      <th>COVID-19</th>
+      <th>Influenza A</th>
+      <th>Measles</th>
+      <th>Pertussis</th>
+      <th>Ebola</th>
+      <th>mpox</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Transmission rate per day – β</strong></td>
+      <td>Wild<br>0.21–0.28<br><br>Omicron<br>1.14–2.0</td>
+      <td>1.8</td>
+      <td>1.7–2.6</td>
+      <td>0.2–0.5</td>
+      <td>0.2 to 0.3</td>
+      <td>0.01 to 0.1</td>
+    </tr>
+    <tr>
+      <td><strong>Exposure rate – σ (1/Incubation Period)</strong></td>
+      <td>0.21 (1/4.6 days)</td>
+      <td>0.5 (1/2 days)</td>
+      <td>0.08 (1/13 days)</td>
+      <td>1/7–1/10</td>
+      <td>1/2–1/21</td>
+      <td>1/10</td>
+    </tr>
+    <tr>
+      <td><strong>Recovery rate – γ (1/duration of infectiousness)</strong></td>
+      <td>0.1–0.2<br>(≈ 1/5–10 days)</td>
+      <td>0.2<br>(1/5 days)</td>
+      <td>0.1–0.14<br>(1/7–10 days)</td>
+      <td>0.071</td>
+      <td>1/6–1/16</td>
+      <td>0.05</td>
+    </tr>
+  </tbody>
+</table>
