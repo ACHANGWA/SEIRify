@@ -31,9 +31,10 @@ Figure 3. A screenshot showing how to activate both the simulated scenario only 
 # The input data
 
 In SEIRify, users can upload their own outbreak datasets in CSV format using the “Choose CSV File” option for the ‘real versus simulated scenario’ ONLY. For users who do not have a dataset, a mock dataset can be downloaded directly from the interface at the bottom left corner (‘Download Mock Data’). Note that this is a dummy dataset for demonstration. The input data must follow a structured format with specific variables. The uploaded dataset must have the following required variables and format;
-	date_of_exposure – the date when an individual was exposed to infection in YYY-MM-DD format.
-	date_of_onset – the date when symptoms or infection onset occurred in YYY-MM-DD format.
-	Any other demographic or disease-related required variable (Figure 3).
+
+-	date_of_exposure: the date when an individual was exposed to infection in YYY-MM-DD format.
+-	date_of_onset: the date when symptoms or infection onset occurred in YYY-MM-DD format.
+-	Any other demographic or disease-related required variable (Figure 3).
 
 
 
