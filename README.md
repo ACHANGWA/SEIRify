@@ -285,10 +285,15 @@ Overall, SEIRify, offers a programming-free, interactive tool for visualizing ep
 # Availability and requirements
 
 Application name: SEIRify
+
 Application home page: https://achangwa.shinyapps.io/SEIRify/ 
+
 Operating system: Platform independent.
+
 Programming language: R.
+
 Other requirements: Any web browser, 
+
 Any restrictions on use: Organizations are welcome to contact the author before use.
 
 
