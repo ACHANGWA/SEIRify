@@ -7,4 +7,8 @@ This application is available as a shiny application downloadable at https://git
 
 To install and run the shiny app locally on your computer you will need to first install R, it is also suggested that you install Rstudio. For detailed instructions for installing the R and R studio, visit the respective links https://cran.r-project.org/bin/windows/base/ and https://posit.co/download/rstudio-desktop
 
+# About page
+
+Upon initially loading the application, users will see the “About” icon at the top right side of the application. This page provides an overview of the methods employed within the dashboard, including model specification, forecasting, and details of the available evaluation statistics. 
+
 
