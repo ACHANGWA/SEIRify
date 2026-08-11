@@ -241,7 +241,62 @@ The exposed population showed distinct patterns between the simulated and real d
 <img width="692" height="461" alt="image" src="https://github.com/user-attachments/assets/0b5e22d2-7d78-45de-906f-dbb16ac07f9e" />
 Figure 17. Output for the real versus simulated scenario E compartment
 
+# The Infected (I) compartment 
+
+The infected population displayed the characteristic epidemic curve in both the simulated and real scenarios, though with differences in peak intensity and timing. In the simulated outbreak, infections rose rapidly, reaching a peak of just over 100 individuals around day 17 before gradually declining. The 95% confidence interval captured the range of plausible trajectories but consistently indicated a sharp and high peak. In the real data, however, the epidemic peak was lower, with approximately 60 individuals infected simultaneously, and the curve was broader, indicating a slower rise and fall in cases. This could suggest that while the simulation predicted a more intense and concentrated epidemic wave, the real dataset reflected a less severe but more prolonged transmission dynamic.
+
+<img width="853" height="568" alt="image" src="https://github.com/user-attachments/assets/aabf26a4-0e01-40aa-bf18-045892a350b2" />
+
+Figure 18. Output for the real versus simulated scenario I compartment
+
+# The Recovered (R) compartment 
+
+The recovered population increased steadily in both the simulated and real scenarios but differed in timing and magnitude. In the simulated outbreak, recoveries began to rise sharply around day 10, while the real data showed a slower and more gradual accumulation of recoveries. 
+<img width="775" height="517" alt="image" src="https://github.com/user-attachments/assets/c3bffefe-03d4-4877-ad5a-f13d1f974026" />
+
+Figure 19. Output for the real versus simulated scenario R compartment
+
+# Comparison between the simulated and real scenarios
+
+The comparison of real versus simulated scenarios produced the following epidemic metrics. The simulation predicted 4 more infections than were observed in the real dataset (Estimate: –4, 95% CI: –6 to –4). There was no difference in epidemic duration, with both scenarios spanning a similar number of days as expected. However, the peak number of infections was estimated to be 21 cases higher in the simulation scenario (95% CI: 13–28), suggesting the model projected a more intense epidemic wave. The timing of the epidemic peak was delayed by 2 days in the simulated scenario compared to the real data (95% CI: –1 to 3), while the epidemic onset was also delayed by 2 days (95% CI: 1–4).
+
+Table 2. Out of the comparison window of the real versus simulated scenario
+| Metric | Estimate | Lower CI | Upper CI |
+|---|---:|---:|---:|
+| **Reduced Infections** | -4 | -6 | -4 |
+| **Reduced Duration (days)** | 0 | 0 | 0 |
+| **Reduced Peak** | 21 | 13 | 28 |
+| **Delayed Peak (days)** | 2 | -1 | 3 |
+| **Delayed Start (days)** | 2 | 1 | 4 |
 
 
+# Technical validation
+
+SEIRify was validated through a series of simulation checks and exercises. Model outputs from the SI, SIR, and SEIR implementations were compared against independently coded models, with consistent epidemic trajectories observed. Validation with mock outbreak datasets confirmed that simulated versus real scenario comparisons accurately reproduced epidemic metrics such as peak timing, total infections, and outbreak duration. Output remained stable across different computing environments (local RStudio, web-based, and offline use), ensuring reproducibility. Interface stress-testing demonstrated that parameter adjustments and dataset uploads were correctly propagated to visualizations and downloadable outputs.
+
+
+# Conclusion
+
+Post-outbreak community infectious disease modeling and forecasting provide an understanding of epidemic dynamics, direction for intervention planning, and policy decision-making. As shown above, SEIRify provides an interactive interface for modeling post-outbreak diseases in the community. The application supports both simulated scenarios and real versus simulated comparisons, enables visualization of epidemic dynamics across compartments, and allows for customizable parameter inputs, while offering outputs in multiple formats. Its strength lies in providing a user-friendly, programming-free environment for retrospective epidemic modeling, making modeling techniques more widely accessible to health workers with no modeling background.
+
+Although SEIRify broadens access to compartmental modeling, it is not without limitations. First, the platform assumes users possess a basic understanding of infectious disease dynamics and the interpretation of epidemiological parameters. Second, it does not provide detailed modeling guidance beyond short descriptions of input variables and model outputs.
+Overall, SEIRify, offers a programming-free, interactive tool for visualizing epidemic dynamics, facilitating side-by-side comparisons of real and simulated outbreaks, and fostering greater engagement with infectious disease modeling among professionals.
+
+# Availability and requirements
+
+Application name: SEIRify
+Application home page: https://achangwa.shinyapps.io/SEIRify/ 
+Operating system: Platform independent.
+Programming language: R.
+Other requirements: Any web browser, 
+Any restrictions on use: Organizations are welcome to contact the author before use.
+
+
+# Conflict of interest
+We declare that we have no commercial or financial relationships that could be perceived as a potential conflict of interest in the development of this application.
+
+
+# Acknowledgement
+The authors would like to thank all those who tested the application using various exercises
 
 
