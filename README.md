@@ -136,6 +136,7 @@ Below are the epidemiological parameters for some selected infectious diseases. 
 To demonstrate the simulated functionality of SEIRify, we modeled an influenza A outbreak in a hypothetical community of 100 individuals over a 30-day period using the SEIR compartmental model. At the start of the simulation, the population was initialized with 99 susceptible, 1 infected, 0 exposed, and 0 recovered individuals, reflecting the introduction of a single index case into an otherwise susceptible population. 
 
 <img width="466" height="864" alt="image" src="https://github.com/user-attachments/assets/d14bdbd3-b77b-448e-aa4d-ac04141064d2" />
+
 Figure 8. Screenshot showing initial input of population parameters
 
 The model parameters were specified as follows: transmission rate (β) of 1.8 per contact per unit time, exposure rate (σ) of 0.5 (corresponding to an average incubation period of 2 days), and recovery rate (γ) of 0.24 (corresponding to an average infectious period of approximately 4 days). These parameter values represent plausible ranges for influenza A transmission dynamics as published in the empirical literature [].
@@ -143,5 +144,41 @@ The model parameters were specified as follows: transmission rate (β) of 1.8 pe
 <img width="623" height="500" alt="image" src="https://github.com/user-attachments/assets/2c796078-fd2c-4602-9095-39bcbb925b85" />
 Figure 9. Screenshot showing initial input of transmission parameters
 
-# 
+# The outputs
+# Visualization
+
+After selecting the “show compartment separately” option, we visualized each compartment individually to better understand the dynamics of the simulated outbreak. Visual plots for each compartment downloaded from SEIRify are shown below.
+
+# The susceptible (S) compartment 
+
+The susceptible population declined rapidly over the 30-day simulation period. Beginning with 99 susceptible individuals at the onset of the epidemic, the curve shows an accelerated decrease between days 5 and 10 as exposure and transmission intensified. By approximately day 12, the number of susceptible individuals dropped close to zero, indicating that nearly the entire population had transitioned to exposed or infected compartments.
+
+<img width="797" height="532" alt="image" src="https://github.com/user-attachments/assets/cee4419e-0566-4b31-b3c9-c9809bdc92bf" />
+
+Figure 10. Output for the simulated scenario S compartment
+
+
+# The Exposed (E) compartment 
+
+The exposed population followed a bell-shaped trajectory during the 30-day simulation. Starting at zero, the number of exposed individuals rose steadily as susceptibles became infected but had not yet developed symptoms. The curve peaked around day 8, with approximately 28 individuals in the exposed state, reflecting the maximum buildup of latent infections. After the peak, the exposed population declined sharply as individuals transitioned into the infectious compartment. By day 20, the exposed compartment had nearly returned to zero, indicating depletion of the latent pool as the epidemic progressed.
+
+<img width="726" height="484" alt="image" src="https://github.com/user-attachments/assets/8a311506-c1e8-4ff1-b2d6-37cd2997049a" />
+
+Figure 11. Output for the simulated scenario E compartment
+
+# The Infected (I) compartment 
+
+Beginning with a single index case, the number of infected individuals increased gradually in the first few days, followed by a sharp rise as transmission accelerated. The curve peaked around day 10, with nearly 38 individuals simultaneously infectious, representing the maximum burden of active cases in the community. After this peak, the number of infected individuals declined steadily as recoveries outpaced new infections.
+<img width="525" height="350" alt="image" src="https://github.com/user-attachments/assets/d642a737-319c-454e-a1d4-0a7d1d9ce868" />
+Figure 12. Output for the simulated scenario I compartment
+
+# The Recovered (R) compartment 
+
+
+
+
+
+
+
+
 
