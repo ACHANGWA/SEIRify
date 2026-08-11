@@ -35,7 +35,8 @@ In SEIRify, users can upload their own outbreak datasets in CSV format using the
 -	date_of_exposure: the date when an individual was exposed to infection in YYY-MM-DD format.
 -	date_of_onset: the date when symptoms or infection onset occurred in YYY-MM-DD format.
 -	Any other demographic or disease-related required variable (Figure 3).
-
+<img width="940" height="665" alt="image" src="https://github.com/user-attachments/assets/c8d23022-1a3b-45cc-80fe-68210f66d6af" />
+Figure 4. Screenshot of the data CSV file
 
 
 
