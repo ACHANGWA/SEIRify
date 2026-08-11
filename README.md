@@ -50,6 +50,16 @@ In SIR models, infected individuals eventually recover and move into the recover
 
 -	Susceptible (S) – Exposed (E) – Infectious (I) – Recovered (R): SEIR Model
 The SEIR model adds an exposed class to capture the incubation period during which individuals are infected but not yet infectious. This model is widely used for acute infectious diseases with a latent stage. Parameters required for this model include the transmission rate (β), the progression rate (k) from exposed to infectious (defined as the reciprocal of the incubation period, 1/incubation period), and the recovery rate (α) (1/mean infectious period).
+<img width="590" height="91" alt="image" src="https://github.com/user-attachments/assets/70359ba1-2160-4d8a-9fd5-23ede1532dd0" />
+
+<img width="346" height="188" alt="image" src="https://github.com/user-attachments/assets/40357e87-2b21-4f72-9efa-ab0d34cec00f" />
+Figure 5. Screenshot displaying the compartmental models in SEIRify
+
+Depending on the user’s interest, SEIRify provides the option to visualize the dynamics of individual model compartments separately. By selecting “Show compartments separately”, users can isolate and plot the trajectory of a chosen compartment (e.g., susceptible, exposed, infected, or recovered). In addition, the interface allows the display of confidence intervals for either the simulated scenario, the real scenario, or both, with selectable levels (95%, 90%, 75%, or 50%). This functionality enables more detailed exploration of compartment-specific dynamics and facilitates comparison between real and simulated outcomes
+<img width="480" height="587" alt="image" src="https://github.com/user-attachments/assets/74bf2a09-359b-48bb-9fcd-b1452826d686" />
+Figure 6. Screenshot showing selection of the ‘show compartment separately’ icon and its specificities
+
+# The population 
 
 
 
