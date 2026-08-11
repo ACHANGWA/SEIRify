@@ -25,7 +25,17 @@ Figure 2. A screenshot of the Demographics tab
 # The scenarios
 
 SEIRify allows users to explore two types of scenarios, the simulated scenario and the real versus simulated scenario. To activate each scenario, the toggle must be switched on for the simulated scenario and off for the real versus simulated scenario (Figure 2). In the simulated scenario, the model generates plots and model parameters for each compartment based only on user-defined parameters, including population size, transmission rate, recovery rate, and simulation duration. This mode is useful for examining hypothetical situations. In the real versus simulated scenario, users are expected to upload an outbreak dataset, and the model compares simulated epidemic curves with the observed data
-<img width="414" height="96" alt="image" src="https://github.com/user-attachments/assets/0b3c081e-50aa-4e5c-9d87-41335e02cb8c" /> <img width="544" height="97" alt="image" src="https://github.com/user-attachments/assets/24864691-6531-4644-82a6-d7c24925ad2d" />
+<img width="967" height="98" alt="image" src="https://github.com/user-attachments/assets/004f11a2-d303-4417-98f4-d96f7eb004ee" />
+Figure 3. A screenshot showing how to activate both the simulated scenario only and the real versus simulated scenario
+
+# The input data
+
+In SEIRify, users can upload their own outbreak datasets in CSV format using the “Choose CSV File” option for the ‘real versus simulated scenario’ ONLY. For users who do not have a dataset, a mock dataset can be downloaded directly from the interface at the bottom left corner (‘Download Mock Data’). Note that this is a dummy dataset for demonstration. The input data must follow a structured format with specific variables. The uploaded dataset must have the following required variables and format;
+	date_of_exposure – the date when an individual was exposed to infection in YYY-MM-DD format.
+	date_of_onset – the date when symptoms or infection onset occurred in YYY-MM-DD format.
+	Any other demographic or disease-related required variable (Figure 3).
+
+
 
 
 
