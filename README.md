@@ -24,6 +24,9 @@ Figure 2. A screenshot of the Demographics tab
 
 # The scenarios
 
+SEIRify allows users to explore two types of scenarios, the simulated scenario and the real versus simulated scenario. To activate each scenario, the toggle must be switched on for the simulated scenario and off for the real versus simulated scenario (Figure 2). In the simulated scenario, the model generates plots and model parameters for each compartment based only on user-defined parameters, including population size, transmission rate, recovery rate, and simulation duration. This mode is useful for examining hypothetical situations. In the real versus simulated scenario, users are expected to upload an outbreak dataset, and the model compares simulated epidemic curves with the observed data
+<img width="414" height="96" alt="image" src="https://github.com/user-attachments/assets/0b3c081e-50aa-4e5c-9d87-41335e02cb8c" /> <img width="544" height="97" alt="image" src="https://github.com/user-attachments/assets/24864691-6531-4644-82a6-d7c24925ad2d" />
+
 
 
 
