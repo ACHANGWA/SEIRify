@@ -170,9 +170,41 @@ Figure 11. Output for the simulated scenario E compartment
 
 Beginning with a single index case, the number of infected individuals increased gradually in the first few days, followed by a sharp rise as transmission accelerated. The curve peaked around day 10, with nearly 38 individuals simultaneously infectious, representing the maximum burden of active cases in the community. After this peak, the number of infected individuals declined steadily as recoveries outpaced new infections.
 <img width="525" height="350" alt="image" src="https://github.com/user-attachments/assets/d642a737-319c-454e-a1d4-0a7d1d9ce868" />
+
 Figure 12. Output for the simulated scenario I compartment
 
 # The Recovered (R) compartment 
+
+The recovered population increased gradually during the early days of the simulation, reflecting the time lag between infection and recovery. From day 7 onward, recoveries accelerated as more individuals transitioned out of the infectious state. The curve rose steadily until around day 20, when it began to plateau as the epidemic waned and the susceptible population was nearly exhausted. By the end of the 30 days, the entire community had entered the recovered compartment, highlighting the self-limiting nature of the outbreak under the assumed SEIR model parameters.
+<img width="742" height="495" alt="image" src="https://github.com/user-attachments/assets/884ea725-1003-4c52-8f6f-2581289a3116" />
+
+Figure 13. Output for the simulated scenario R compartment
+
+# Model parameters
+
+The model parameters downloaded from SEIRify are shown in Table 1. The output showed that the epidemic reached its peak on day 11, when 38 individuals were simultaneously infected.
+
+Table 1.Simulated only model parameters 
+| Parameter | Description | Value |
+|---|---|---:|
+| **N** | Total population size | 100 |
+| **Beta** | Transmission rate (range: 0.1–3.0 per day) | 1.8 |
+| **Sigma** | Exposure rate (range: 0.1–1.0 per day) | 0.5 |
+| **Gamma** | Recovery rate (range: 0.05–0.5 per day) | 0.24 |
+| **R0** | Basic reproduction number (Beta/Gamma) | 7.5 |
+| **Initial S** | Initial susceptible population | 99 |
+| **Initial E** | Initial exposed population | 0 |
+| **Initial I** | Initial infected population | 1 |
+| **Initial R** | Initial recovered population | 0 |
+| **Final S** | Final susceptible population | 0 |
+| **Final E** | Final exposed population | 0 |
+| **Final I** | Final infected population | 1 |
+| **Final R** | Final recovered population | 99 |
+| **Duration (days)** | Duration of epidemic | 30 |
+| **Peak Infections** | Peak number of infected | 38 |
+| **Peak Time** | Day of peak infection | Day 11 |
+| **Incubation Period** | Average incubation period (1/Sigma) | 2 |
+| **Infectious Period** | Average infectious period (1/Gamma) | 4.2 |
 
 
 
