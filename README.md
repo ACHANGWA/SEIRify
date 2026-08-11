@@ -11,4 +11,7 @@ To install and run the shiny app locally on your computer you will need to first
 
 Upon initially loading the application, users will see the “About” icon at the top right side of the application. This page provides an overview of the methods employed within the dashboard, including model specification, forecasting, and details of the available evaluation statistics. 
 
+<img width="975" height="149" alt="image" src="https://github.com/user-attachments/assets/fcbdfb59-d25a-4cef-b5be-fa1914214165" />
+
+
 
