@@ -17,6 +17,8 @@ output:
 runtime: shiny
 ---
 
+
+
 ```{=html}
 
 <style type="text/css">
@@ -95,7 +97,7 @@ h4, .h4 {
 .navbar.navbar-inverse ul.nav.navbar-nav>li {
     color: #fff;
     font-size: 16px;
-    font-family: "TT Norms Pro";
+    font-family: "TT Norms Pro", "Century Gothic", "Trebuchet MS", Arial, sans-serif;
 }
 
 .nav-tabs-custom > .nav-tabs {
@@ -104,7 +106,7 @@ h4, .h4 {
     color: white;
     border-top-right-radius: 10px;
     border-top-left-radius: 3px;
-    font-family: "Tw Cen MT";
+    font-family: "Tw Cen MT", "Century Gothic", Questrial, "Trebuchet MS", "Helvetica Neue", Arial, sans-serif;
 }
 
 .chart-wrapper, .nav-tabs-custom, .sbframe-commentary {
@@ -116,7 +118,7 @@ h4, .h4 {
 }
 
 .navbar-brand {
-    font-family: "TT Norms Pro Black";
+    font-family: "TT Norms Pro Black", "Century Gothic", "Trebuchet MS", Arial, sans-serif;
     font-size: 36px;
     padding: 0px;
 }
@@ -156,7 +158,7 @@ h4, .h4 {
 }
 
 .section.sidebar {
-    font-family: "TT Norms Pro";
+    font-family: "TT Norms Pro", "Century Gothic", "Trebuchet MS", Arial, sans-serif;
     font-size: 14px;
     background-color: #28282b !important;
     color: white;
@@ -178,7 +180,7 @@ h4, .h4 {
 a {
     color: #28282b;
     font-size: 15px;
-    font-family: TT Norms Pro;
+    font-family: "TT Norms Pro", "Century Gothic", "Trebuchet MS", Arial, sans-serif;
     background-color: transparent;
 }
 
@@ -199,7 +201,7 @@ a {
 
 pre {
 
-    font-family: "TT Norms Pro";
+    font-family: "TT Norms Pro", "Century Gothic", "Trebuchet MS", Arial, sans-serif;
     font-size: medium;
 }
 
@@ -215,10 +217,6 @@ library(flexdashboard)
 library(tidyverse)
 library(highcharter)
 library(tidyr)
-library(extrafont)
-library(extrafontdb)
-library(systemfonts)
-library(sysfonts)
 library(data.table)
 library(DT)
 library(janitor)
@@ -230,48 +228,187 @@ library(deSolve)
 
 options(scipen = 999) # avoid scientific notations
 
-extrafont::loadfonts() # load fonts available on system
+# ---------------------------------------------------------------------------
+# cross-platform setup
+# ---------------------------------------------------------------------------
+# extrafont/sysfonts are Windows-oriented and are not installed on most Linux,
+# macOS or shinyapps.io images, so they are loaded only when actually present
+# and any failure is swallowed. The dashboard never depends on them: all text
+# is rendered by the browser from APP_FONT below.
+for (fp in c("extrafont", "extrafontdb", "sysfonts", "systemfonts")) {
+  if (requireNamespace(fp, quietly = TRUE)) suppressWarnings(try(
+    library(fp, character.only = TRUE), silent = TRUE))
+}
+if (requireNamespace("extrafont", quietly = TRUE)) {
+  suppressWarnings(try(extrafont::loadfonts(quiet = TRUE), silent = TRUE))
+}
 
-# initialize reactive values
-model_results <- reactiveVal(NULL)
-current_model <- reactiveVal(NULL)
-simulation_only <- reactiveVal(TRUE)
-run_clicked <- reactiveVal(FALSE)
-params_changed <- reactiveVal(FALSE)
-previous_mode <- reactiveVal(NULL)
-bootstrap_results <- reactiveVal(NULL)
-real_data_ci <- reactiveVal(NULL)
-dataset <- reactiveVal(NULL)
+# single font stack used by every chart. The first entries are the house fonts
+# (present on the authors' Windows machines); the rest are the fallbacks that
+# browsers on Ubuntu, macOS, Positron and shinyapps.io will actually find.
+APP_FONT <- "Tw Cen MT, Century Gothic, Questrial, Trebuchet MS, Helvetica Neue, Arial, sans-serif"
+
+# ---------------------------------------------------------------------------
+# where the bundled assets live
+# ---------------------------------------------------------------------------
+# one_logo.png, the user manual and the mock data used to be opened by bare
+# relative path, which resolves against the process working directory. That is
+# the app folder under RStudio's Run Document and on shinyapps.io, so it works
+# there - but not when the dashboard is started from somewhere else, which is
+# what `Rscript -e rmarkdown::run("/path/to/app.Rmd")` and some Positron / VS
+# Code launch configurations do. The logo then renders blank and both download
+# buttons return HTTP 404.
+#
+# app_file() tries, in order:
+#   1. a copy cached at knit time (see below),
+#   2. the directories knitr knows about,
+#   3. the working directory - i.e. exactly the old behaviour,
+# and only then gives up. It is therefore never worse than before.
+#
+# The knit-time cache exists because this file's name contains spaces.
+# rmarkdown copies such a file into a temporary directory and knits it there,
+# bringing along the resources it can detect by itself - which is not all of
+# them; on this app it brings the PDF and the CSV but not the PNG. Whatever it
+# does bring is reachable while this chunk runs and gone by the time
+# renderImage() and the download handlers need it, so we take a durable copy
+# now.
+#
+# If you launch the dashboard from outside its own folder, use run_seirify.R
+# (it sets the working directory first). Renaming this file to something
+# without spaces would also remove the temp-copy step entirely.
+APP_ASSET_NAMES <- c("one_logo.png", "SEIRify_User_Manual.pdf", "mock_data-2025-06-13.csv")
+
+APP_KNIT_DIRS <- local({
+  safe <- function(expr) tryCatch(expr, error = function(e) NULL)
+  d <- unlist(c(safe(getwd()),
+                safe(knitr::opts_knit$get("output.dir")),
+                safe(dirname(knitr::current_input(dir = TRUE)))))
+  d <- d[!is.na(d) & nzchar(d)]
+  unique(d[dir.exists(d)])
+})
+
+APP_ASSETS <- local({
+  cache <- file.path(tempdir(), "seirify-assets")
+  dir.create(cache, showWarnings = FALSE, recursive = TRUE)
+  found <- list()                      # a list, so a missing name gives NULL
+  for (f in APP_ASSET_NAMES) {
+    dest <- file.path(cache, f)
+    if (!file.exists(dest)) {
+      for (d in APP_KNIT_DIRS) {
+        src <- file.path(d, f)
+        if (file.exists(src)) { try(file.copy(src, dest, overwrite = TRUE), silent = TRUE); break }
+      }
+    }
+    if (file.exists(dest)) found[[f]] <- dest
+  }
+  found
+})
+
+app_file <- function(name) {
+  hit <- APP_ASSETS[[name]]
+  if (!is.null(hit) && file.exists(hit)) return(hit)
+  for (d in unique(c(getwd(), APP_KNIT_DIRS))) {
+    p <- file.path(d, name)
+    if (file.exists(p)) return(p)
+  }
+  name                                  # old behaviour: plain relative path
+}
+
+# ---------------------------------------------------------------------------
+# reactive state (defined once; do not redeclare these in later chunks)
+# ---------------------------------------------------------------------------
+model_results     <- reactiveVal(NULL)   # data.frame returned by the active model
+current_model     <- reactiveVal(NULL)   # "SI" / "SIR" / "SEIR" at the last run
+simulation_only   <- reactiveVal(TRUE)   # TRUE = simulated-only module
+separate_plots    <- reactiveVal(FALSE)  # TRUE = one compartment per chart
+run_clicked       <- reactiveVal(FALSE)
+params_changed    <- reactiveVal(FALSE)
+previous_mode     <- reactiveVal(NULL)
+dataset           <- reactiveVal(NULL)
+# everything a run needs to be reproduced: N, initial conditions, parameters,
+# window. The confidence bands and the comparison table are derived from it,
+# so they can be refreshed without re-running the model.
+run_context       <- reactiveVal(NULL)
+
+# number of parameter draws behind every confidence band and comparison CI
+CI_N_DRAWS <- 200
+
+`%||%` <- function(a, b) if (is.null(a) || length(a) == 0 || all(is.na(a))) b else a
 
 # date parsing function
-parse_date <- function(x, formats = c("%d/%m/%Y", "%Y-%m-%d", "%m/%d/%Y")) {
+parse_date <- function(x, formats = c("%d/%m/%Y", "%Y-%m-%d", "%m/%d/%Y", "%d-%m-%Y", "%Y/%m/%d")) {
+  if (inherits(x, "Date")) return(x)
+  x <- trimws(as.character(x))
+  x[x == ""] <- NA_character_
+  best <- NULL
+  best_n <- -1L
   for (fmt in formats) {
-    parsed <- as.Date(x, format = fmt)
-    if (all(!is.na(parsed) | x == "" | is.na(x))) return(parsed)
+    parsed <- suppressWarnings(as.Date(x, format = fmt))
+    n_ok <- sum(!is.na(parsed))
+    if (n_ok > best_n) { best_n <- n_ok; best <- parsed }
+    if (all(is.na(x) | !is.na(parsed))) return(parsed)   # perfect match, stop early
   }
-  stop("Unable to parse dates with provided formats")
+  # no format parses every value: keep the best one and let the caller report
+  # how many rows were dropped instead of aborting the whole upload.
+  best
 }
 
 # switched to data.table::fread for faster reading and processing
 observeEvent(input$file1, {
   req(input$file1)
-  df <- fread(input$file1$datapath) %>%
-    as_tibble() %>%
-    mutate(across(everything(), trimws)) %>%
-    clean_names() %>%
-    mutate(
-      date_of_exposure = parse_date(date_of_exposure),
-      date_of_onset = parse_date(date_of_onset)
-    ) %>%
-    filter(!is.na(date_of_onset))
-  dataset(df)
+
+  tryCatch({
+    df <- fread(input$file1$datapath) %>%
+      as_tibble() %>%
+      mutate(across(everything(), ~ if (is.character(.x)) trimws(.x) else .x)) %>%
+      clean_names()
+
+    if (!"date_of_onset" %in% names(df)) {
+      showNotification(
+        "The uploaded file has no 'date_of_onset' column. Required columns: date_of_onset and (for SI/SEIR) date_of_exposure.",
+        type = "error", duration = 15)
+      dataset(NULL)
+      return()
+    }
+
+    n_in <- nrow(df)
+    df <- df %>%
+      mutate(
+        date_of_exposure = if ("date_of_exposure" %in% names(df)) parse_date(date_of_exposure) else as.Date(NA),
+        date_of_onset    = parse_date(date_of_onset)
+      ) %>%
+      filter(!is.na(date_of_onset))
+
+    n_dropped <- n_in - nrow(df)
+    if (n_dropped > 0) {
+      showNotification(
+        paste0(n_dropped, " of ", n_in,
+               " rows were dropped because their onset date could not be read. ",
+               "Accepted formats: dd/mm/yyyy, yyyy-mm-dd, mm/dd/yyyy."),
+        type = "warning", duration = 15)
+    }
+
+    if (nrow(df) == 0) {
+      showNotification("No usable rows left after date parsing.", type = "error", duration = 15)
+      dataset(NULL)
+      return()
+    }
+
+    dataset(df)
+  }, error = function(e) {
+    showNotification(paste("Could not read the uploaded file:", e$message),
+                     type = "error", duration = 15)
+    dataset(NULL)
+  })
 })
 
 ```
 
 ```{r model-functions}
 
+# ---------------------------------------------------------------------------
 # differential equations
+# ---------------------------------------------------------------------------
 
 # SI model ODE
 si_ode <- function(time, state, parameters) {
@@ -303,215 +440,310 @@ seir_ode <- function(time, state, parameters) {
   })
 }
 
-# model functions for simulated data
-run_si_model <- function(N, beta, days, initial_S = NULL, initial_I = NULL) {
+# ---------------------------------------------------------------------------
+# one solver used by BOTH modules
+# ---------------------------------------------------------------------------
+# Every simulated curve in the dashboard - simulated-only mode, real-vs-
+# simulated mode, every confidence-band draw and every comparison replicate -
+# goes through this single function, so the compartment definitions cannot
+# drift between modules.
+#
+#   N      total population at risk (NOT the number of case records)
+#   init   named list/vector with S, I and, where the model needs them, E and R
+#   days   number of days to integrate (day 0 .. day `days`)
+run_model <- function(model_type, N, beta, sigma = NULL, gamma = NULL, days,
+                      init, start_date = as.Date("2020-01-01")) {
 
-  times <- seq(0, days, by = 1)
-  
-  # ODE simulation
-  init <- c(S = initial_S, I = initial_I)
-  parameters <- c(beta = beta, N = N)
-  sim <- ode(y = init, times = times, func = si_ode, parms = parameters)
-  sim_df <- as.data.frame(sim) %>%
-    mutate(Date = as.Date("2020-01-01") + time)
-  
-  return(sim_df)
+  stopifnot(is.numeric(N), length(N) == 1, is.finite(N), N > 0)
+  stopifnot(is.numeric(days), length(days) == 1, is.finite(days), days >= 1)
+
+  g <- function(nm, default = 0) {
+    v <- init[[nm]]
+    if (is.null(v) || !is.finite(v)) default else as.numeric(v)
+  }
+
+  times <- seq(0, round(days), by = 1)
+
+  if (model_type == "SI") {
+    state <- c(S = g("S", N - 1), I = g("I", 1))
+    parms <- c(beta = beta, N = N)
+    fun   <- si_ode
+  } else if (model_type == "SIR") {
+    state <- c(S = g("S", N - 1), I = g("I", 1), R = g("R", 0))
+    parms <- c(beta = beta, gamma = gamma, N = N)
+    fun   <- sir_ode
+  } else if (model_type == "SEIR") {
+    state <- c(S = g("S", N - 1), E = g("E", 0), I = g("I", 1), R = g("R", 0))
+    parms <- c(beta = beta, sigma = sigma, gamma = gamma, N = N)
+    fun   <- seir_ode
+  } else {
+    stop("Unknown model type: ", model_type)
+  }
+
+  # explicit tolerances: the lsoda defaults (1e-6) are loose enough that the
+  # same run can differ in the third decimal between platforms, which makes
+  # the app impossible to check against independently written code.
+  sim <- ode(y = state, times = times, func = fun, parms = parms,
+             atol = 1e-10, rtol = 1e-10)
+  sim_df <- as.data.frame(sim)
+  sim_df$Date <- start_date + sim_df$time
+
+  # incident infections per day, i.e. the people who LEAVE S. This is the
+  # simulated counterpart of observed incidence and is what the comparison
+  # table uses for peak incidence and outbreak duration. (Cumulative
+  # infections is read off S instead - see series_metrics.)
+  sim_df$new_infections <- c(0, pmax(0, -diff(sim_df$S)))
+  sim_df$cum_infections <- cumsum(sim_df$new_infections)
+
+  sim_df
+}
+
+# thin wrappers kept so existing calls and the user manual stay valid
+run_si_model <- function(N, beta, days, initial_S = NULL, initial_I = NULL) {
+  run_model("SI", N, beta, days = days, init = list(S = initial_S, I = initial_I))
 }
 
 run_sir_model <- function(N, beta, gamma, days, initial_S = NULL, initial_I = NULL, initial_R = NULL) {
-  
-  times <- seq(0, days, by = 1)
-  
-  # ODE simulation
-  init <- c(S = initial_S, I = initial_I, R = initial_R)
-  parameters <- c(beta = beta, gamma = gamma, N = N)
-  sim <- ode(y = init, times = times, func = sir_ode, parms = parameters)
-  sim_df <- as.data.frame(sim) %>%
-    mutate(Date = as.Date("2020-01-01") + time)
-  
-  return(sim_df)
+  run_model("SIR", N, beta, gamma = gamma, days = days,
+            init = list(S = initial_S, I = initial_I, R = initial_R))
 }
 
-run_seir_model <- function(N, beta, sigma, gamma, days, initial_S = NULL, initial_E = NULL, initial_I = NULL, initial_R = NULL) {
-  
-  times <- seq(0, days, by = 1)
-  
-  # ODE simulation
-  init <- c(S = initial_S, E = initial_E, I = initial_I, R = initial_R)
-  parameters <- c(beta = beta, sigma = sigma, gamma = gamma, N = N)
-  sim <- ode(y = init, times = times, func = seir_ode, parms = parameters)
-  sim_df <- as.data.frame(sim) %>%
-    mutate(Date = as.Date("2020-01-01") + time)
-  
-  return(sim_df)
+run_seir_model <- function(N, beta, sigma, gamma, days,
+                           initial_S = NULL, initial_E = NULL, initial_I = NULL, initial_R = NULL) {
+  run_model("SEIR", N, beta, sigma = sigma, gamma = gamma, days = days,
+            init = list(S = initial_S, E = initial_E, I = initial_I, R = initial_R))
 }
 
-# model function for real vs. simulated scenario
-run_real_model <- function(dataset, model_type, beta, sigma = NULL, gamma = NULL, N_override = NULL) {
-  N <- if (!is.null(N_override)) N_override else nrow(dataset)
-  
-  if (model_type == "SI") {
-    start_date <- min(dataset$date_of_exposure, na.rm = TRUE)
-    end_date <- max(dataset$date_of_exposure, na.rm = TRUE) + 5 # buffer period (to capture late recoveries)
-    dates <- seq.Date(start_date, end_date, by = "day")
-    times <- seq(0, length(dates) - 1, by = 1)
-    
-    # ODE simulation
-    init <- c(S = N - 1, I = 1)
-    parameters <- c(beta = beta, N = N)
-    sim <- ode(y = init, times = times, func = si_ode, parms = parameters)
-    sim_df <- as.data.frame(sim) %>%
-      mutate(Date = start_date + time)
-    
-    # real data processing
-    infection_counts <- dataset %>%
-      group_by(date_of_exposure) %>%
-      summarise(new_infections = n()) %>%
-      rename(Date = date_of_exposure) %>%
-      complete(Date = dates, fill = list(new_infections = 0))
-    
-    si_df <- data.frame(Date = dates) %>%
-      left_join(infection_counts, by = "Date") %>%
-      replace_na(list(new_infections = 0))
-    
-    si_df$S_real <- NA
-    si_df$I_real <- NA
-    si_df$S_real[1] <- N
-    si_df$I_real[1] <- 0
-    for (t in 2:length(dates)) {
-      si_df$S_real[t] <- si_df$S_real[t-1] - si_df$new_infections[t]
-      si_df$I_real[t] <- si_df$I_real[t-1] + si_df$new_infections[t]
-    }
-    
-    # ensure non-negative counts
-    si_df$S_real <- pmax(si_df$S_real, 0)
-    si_df$I_real <- pmax(si_df$I_real, 0)
-    
-    # merge simulated and real
-    sim_df <- sim_df %>%
-      left_join(select(si_df, Date, S_real, I_real), by = "Date")
-    
-    return(sim_df)
-  } else if (model_type == "SIR") {
-    start_date <- min(dataset$date_of_onset, na.rm = TRUE)
-    end_date <- max(dataset$date_of_onset, na.rm = TRUE) + ceiling(1/gamma) + 5
-    dates <- seq.Date(start_date, end_date, by = "day")
-    times <- seq(0, length(dates) - 1, by = 1)
-    
-    # ODE simulation
-    init <- c(S = N - 1, I = 1, R = 0)
-    parameters <- c(beta = beta, gamma = gamma, N = N)
-    sim <- ode(y = init, times = times, func = sir_ode, parms = parameters)
-    sim_df <- as.data.frame(sim) %>%
-      mutate(Date = start_date + time)
-    
-    # real data processing
-    onset_counts <- dataset %>%
-      group_by(date_of_onset) %>%
-      summarise(new_I = n()) %>%
-      rename(Date = date_of_onset) %>%
-      complete(Date = dates, fill = list(new_I = 0))
-    
-    recovery_counts <- dataset %>%
-      mutate(recovery_date = date_of_onset + ceiling(1/gamma)) %>% # uses the gamma parameter for recovery days
-      group_by(recovery_date) %>%
-      summarise(new_R = n()) %>%
-      rename(Date = recovery_date) %>%
-      complete(Date = dates, fill = list(new_R = 0))
-    
-    sir_df <- data.frame(Date = dates) %>%
-      left_join(onset_counts, by = "Date") %>%
-      left_join(recovery_counts, by = "Date") %>%
-      replace_na(list(new_I = 0, new_R = 0))
-    
-    sir_df$S_real <- NA
-    sir_df$I_real <- NA
-    sir_df$R_real <- NA
-    sir_df$S_real[1] <- N
-    sir_df$I_real[1] <- 0
-    sir_df$R_real[1] <- 0
-    for (t in 2:length(dates)) {
-      sir_df$S_real[t] <- sir_df$S_real[t-1] - sir_df$new_I[t]
-      sir_df$I_real[t] <- sir_df$I_real[t-1] + sir_df$new_I[t] - sir_df$new_R[t]
-      sir_df$R_real[t] <- sir_df$R_real[t-1] + sir_df$new_R[t]
-    }
-    
-    # ensure non-negative counts
-    sir_df$S_real <- pmax(sir_df$S_real, 0)
-    sir_df$I_real <- pmax(sir_df$I_real, 0)
-    sir_df$R_real <- pmax(sir_df$R_real, 0)   
-    
-    # merge simulated and real
-    sim_df <- sim_df %>%
-      left_join(select(sir_df, Date, S_real, I_real, R_real), by = "Date")
-    
-    return(sim_df)
-  } else if (model_type == "SEIR") {
-    start_date <- min(dataset$date_of_exposure, na.rm = TRUE)
-    end_date <- max(dataset$date_of_onset, na.rm = TRUE) + ceiling(1/gamma) + 5
-    dates <- seq.Date(start_date, end_date, by = "day")
-    times <- seq(0, length(dates) - 1, by = 1)
-    
-    # ODE simulation
-    init <- c(S = N - 1, E = 0, I = 1, R = 0)
-    parameters <- c(beta = beta, sigma = sigma, gamma = gamma, N = N)
-    sim <- ode(y = init, times = times, func = seir_ode, parms = parameters)
-    sim_df <- as.data.frame(sim) %>%
-      mutate(Date = start_date + time)
-    
-    # real data processing
-    exposure_counts <- dataset %>%
-      group_by(date_of_exposure) %>%
-      summarise(new_E = n()) %>%
-      rename(Date = date_of_exposure) %>%
-      complete(Date = dates, fill = list(new_E = 0))
-    
-    onset_counts <- dataset %>%
-      group_by(date_of_onset) %>%
-      summarise(new_I = n()) %>%
-      rename(Date = date_of_onset) %>%
-      complete(Date = dates, fill = list(new_I = 0))
-    
-    recovery_counts <- dataset %>%
-      mutate(recovery_date = date_of_onset + ceiling(1/gamma)) %>%
-      group_by(recovery_date) %>%
-      summarise(new_R = n()) %>%
-      rename(Date = recovery_date) %>%
-      complete(Date = dates, fill = list(new_R = 0))
-    
-    seir_df <- data.frame(Date = dates) %>%
-      left_join(exposure_counts, by = "Date") %>%
-      left_join(onset_counts, by = "Date") %>%
-      left_join(recovery_counts, by = "Date") %>%
-      replace_na(list(new_E = 0, new_I = 0, new_R = 0))
-    
-    seir_df$S_real <- NA
-    seir_df$E_real <- NA
-    seir_df$I_real <- NA
-    seir_df$R_real <- NA
-    seir_df$S_real[1] <- N
-    seir_df$E_real[1] <- 0
-    seir_df$I_real[1] <- 0
-    seir_df$R_real[1] <- 0
-    for (t in 2:length(dates)) {
-      seir_df$S_real[t] <- seir_df$S_real[t-1] - seir_df$new_E[t]
-      seir_df$E_real[t] <- seir_df$E_real[t-1] + seir_df$new_E[t] - seir_df$new_I[t]
-      seir_df$I_real[t] <- seir_df$I_real[t-1] + seir_df$new_I[t] - seir_df$new_R[t]
-      seir_df$R_real[t] <- seir_df$R_real[t-1] + seir_df$new_R[t]
-    }
-    
-    # ensure non-negative counts
-    seir_df$S_real <- pmax(seir_df$S_real, 0)
-    seir_df$E_real <- pmax(seir_df$E_real, 0)
-    seir_df$I_real <- pmax(seir_df$I_real, 0)
-    seir_df$R_real <- pmax(seir_df$R_real, 0)    
-    
-    # merge simulated and real
-    sim_df <- sim_df %>%
-      left_join(select(seir_df, Date, S_real, E_real, I_real, R_real), by = "Date")
-    
-    return(sim_df)
+# ---------------------------------------------------------------------------
+# observed (real) data
+# ---------------------------------------------------------------------------
+
+# Line list -> daily event counts. Every reconstruction in the app starts here,
+# so the SI / SIR / SEIR branches cannot disagree about what a "case" is.
+#
+# Cases whose exposure date is missing (or later than onset) get an imputed
+# exposure date = onset - mean observed incubation period, otherwise they would
+# enter I without ever passing through E and drive E_real negative.
+observed_events <- function(dataset, gamma = NULL) {
+  stopifnot(is.data.frame(dataset), nrow(dataset) > 0)
+
+  onset <- as.Date(dataset$date_of_onset)
+  expo  <- if ("date_of_exposure" %in% names(dataset)) as.Date(dataset$date_of_exposure) else as.Date(rep(NA, length(onset)))
+
+  keep  <- !is.na(onset)
+  onset <- onset[keep]; expo <- expo[keep]
+
+  incub <- as.numeric(onset - expo)
+  valid <- incub[!is.na(incub) & incub >= 0]
+  mean_incub <- if (length(valid) > 0) round(mean(valid)) else 0
+
+  bad <- is.na(expo) | expo > onset
+  expo[bad] <- onset[bad] - mean_incub
+
+  recovery_days <- if (!is.null(gamma) && is.finite(gamma) && gamma > 0) ceiling(1 / gamma) else 7
+  recov <- onset + recovery_days
+
+  list(exposure = expo, onset = onset, recovery = recov,
+       n_cases = length(onset), mean_incubation = mean_incub,
+       recovery_days = recovery_days)
+}
+
+# ---------------------------------------------------------------------------
+# which date counts as "the infection happened"
+# ---------------------------------------------------------------------------
+# SI and SIR both go straight from S to I - neither has a latent class - yet
+# the app as received reads that transition from a different column in each:
+# SI uses date_of_exposure, SIR uses date_of_onset. For the same file the two
+# models therefore place the same case on different days, and start the window
+# on different days.
+#
+# Which one is right is an epidemiological judgement, not a bug to be fixed
+# quietly, so it is now an explicit choice with the ORIGINAL behaviour as the
+# default. "default" reproduces exactly what the app did before:
+#
+#   event = "default"   SI -> exposure, SIR -> onset   (unchanged behaviour)
+#   event = "exposure"  both read the S -> I transition from date_of_exposure
+#   event = "onset"     both read it from date_of_onset
+#
+# SEIR is unaffected: it needs both columns by construction (exposure enters E,
+# onset moves E to I), so the setting does not apply to it.
+resolve_event <- function(model_type, event = "default") {
+  if (model_type == "SEIR") return("seir")
+  if (is.null(event) || !nzchar(event) || event == "default") {
+    switch(model_type, "SI" = "exposure", "SIR" = "onset")
+  } else {
+    match.arg(event, c("exposure", "onset"))
   }
+}
+
+# The date on which each case is taken to have entered I, and the date it
+# leaves again. Infectiousness is measured from the infection event, so if the
+# event is the exposure date the recovery date shifts with it.
+infection_dates <- function(ev, model_type, event = "default") {
+  w <- resolve_event(model_type, event)
+  infect <- if (w == "onset") ev$onset else ev$exposure
+  list(infection = infect, recovery = infect + ev$recovery_days, which = w)
+}
+
+# The date grid a real-vs-simulated run is evaluated on.
+# `extra_days` lets the user run the simulation past the end of the observed
+# data; the observed series simply stops where the data stops.
+observed_window <- function(dataset, model_type, gamma = NULL, extra_days = 0,
+                            event = "default") {
+  ev <- observed_events(dataset, gamma)
+
+  if (model_type == "SEIR") {
+    start_date <- min(ev$exposure)
+    end_date   <- max(ev$recovery) + 5
+  } else {
+    inf <- infection_dates(ev, model_type, event)
+    start_date <- min(inf$infection)
+    end_date   <- if (model_type == "SI") max(inf$infection) + 5 else max(inf$recovery) + 5
+  }
+
+  end_date <- end_date + max(0, round(extra_days))
+
+  list(dates = seq.Date(start_date, end_date, by = "day"),
+       start_date = start_date, end_date = end_date, events = ev)
+}
+
+# Reconstruct the observed compartments on a given date grid.
+#
+# Three quantities are produced and kept distinct, because the review found
+# them conflated:
+#   new_*       observed INCIDENCE  - cases with that event date (day 1 included)
+#   cum_I_real  CUMULATIVE INFECTIONS - everyone infected up to and including that day
+#   I_real      reconstructed infectious PREVALENCE - still infectious on that day
+#
+# Prevalence is built with cumsum() over the full grid (the previous version
+# started its loop at t = 2 and silently discarded every case dated on the
+# first day of the window).
+reconstruct_observed <- function(dataset, model_type, dates, N, gamma = NULL,
+                                 event = "default") {
+  dates <- as.Date(dates)
+  ev    <- observed_events(dataset, gamma)
+
+  count_on <- function(d) {
+    tab <- table(factor(as.character(d), levels = as.character(dates)))
+    as.numeric(tab)
+  }
+
+  if (model_type != "SEIR") {
+    inf <- infection_dates(ev, model_type, event)
+    new_inf <- count_on(inf$infection)
+    new_rec <- count_on(inf$recovery)
+  } else {
+    new_inf <- NULL; new_rec <- NULL
+  }
+
+  new_E <- count_on(ev$exposure)
+  new_I <- count_on(ev$onset)
+  new_R <- count_on(ev$recovery)
+
+  out <- data.frame(Date = dates, new_E = new_E, new_I = new_I, new_R = new_R)
+
+  cum_E <- cumsum(new_E)
+  cum_I <- cumsum(new_I)
+  cum_R <- cumsum(new_R)
+
+  if (model_type == "SI") {
+    # SI has no latent and no recovered class: the infection event IS the
+    # moment the case becomes infectious, and nobody ever leaves I
+    cum_inf <- cumsum(new_inf)
+    out$new_infections <- new_inf
+    out$cum_I_real     <- cum_inf
+    out$S_real <- N - cum_inf
+    out$I_real <- cum_inf
+    out$E_real <- NA_real_
+    out$R_real <- NA_real_
+  } else if (model_type == "SIR") {
+    cum_inf <- cumsum(new_inf)
+    cum_rec <- cumsum(new_rec)
+    out$new_infections <- new_inf
+    out$cum_I_real     <- cum_inf
+    out$S_real <- N - cum_inf
+    out$I_real <- cum_inf - cum_rec
+    out$E_real <- NA_real_
+    out$R_real <- cum_rec
+  } else {                       # SEIR
+    # the infection event is the EXPOSURE; onset is the E -> I transition
+    out$new_infections <- new_E
+    out$cum_I_real     <- cum_E
+    out$S_real <- N - cum_E
+    out$E_real <- cum_E - cum_I
+    out$I_real <- cum_I - cum_R
+    out$R_real <- cum_R
+  }
+
+  for (cl in c("S_real", "E_real", "I_real", "R_real")) {
+    out[[cl]] <- pmax(0, out[[cl]])
+  }
+
+  out
+}
+
+# Initial conditions for the real-vs-simulated module, read off the data at the
+# first day of the window instead of always seeding one infected individual.
+estimate_initial_conditions <- function(dataset, model_type, N, gamma = NULL, extra_days = 0,
+                                        event = "default") {
+  win <- observed_window(dataset, model_type, gamma, extra_days, event)
+  obs <- reconstruct_observed(dataset, model_type, win$dates, N, gamma, event)
+  first <- obs[1, ]
+
+  if (model_type == "SI") {
+    I0 <- max(first$I_real, 1)
+    init <- list(S = N - I0, I = I0)
+  } else if (model_type == "SIR") {
+    I0 <- max(first$I_real, 1)
+    R0c <- first$R_real
+    init <- list(S = N - I0 - R0c, I = I0, R = R0c)
+  } else {
+    E0  <- first$E_real
+    I0  <- first$I_real
+    R0c <- first$R_real
+    if (E0 + I0 < 1) I0 <- 1          # the outbreak has to start somewhere
+    init <- list(S = N - E0 - I0 - R0c, E = E0, I = I0, R = R0c)
+  }
+
+  init <- lapply(init, function(v) max(0, round(as.numeric(v))))
+  init$.window <- win
+  init
+}
+
+# ---------------------------------------------------------------------------
+# real vs. simulated
+# ---------------------------------------------------------------------------
+# N and `init` are now supplied by the caller (ultimately by the user). The
+# function no longer invents N = nrow(dataset) nor seeds S = N-1, I = 1.
+run_real_model <- function(dataset, model_type, beta, sigma = NULL, gamma = NULL,
+                           N, init = NULL, extra_days = 0, event = "default") {
+
+  stopifnot(!missing(N), is.numeric(N), is.finite(N), N > 0)
+
+  win   <- observed_window(dataset, model_type, gamma, extra_days, event)
+  dates <- win$dates
+
+  if (is.null(init)) {
+    init <- estimate_initial_conditions(dataset, model_type, N, gamma, extra_days, event)
+  }
+  init <- init[intersect(names(init), c("S", "E", "I", "R"))]
+
+  sim_df <- run_model(model_type, N = N, beta = beta, sigma = sigma, gamma = gamma,
+                      days = length(dates) - 1, init = init, start_date = win$start_date)
+
+  obs <- reconstruct_observed(dataset, model_type, dates, N, gamma, event)
+
+  obs_cols <- c("Date", "new_infections", "cum_I_real",
+                intersect(c("S_real", "E_real", "I_real", "R_real"), names(obs)))
+  obs <- obs[, obs_cols]
+  names(obs)[names(obs) == "new_infections"] <- "new_infections_real"
+
+  out <- dplyr::left_join(sim_df, obs, by = "Date")
+  attr(out, "N") <- N
+  attr(out, "init") <- init
+  attr(out, "window") <- win
+  attr(out, "event") <- resolve_event(model_type, event)
+  out
 }
 
 ```
@@ -519,481 +751,277 @@ run_real_model <- function(dataset, model_type, beta, sigma = NULL, gamma = NULL
 
 ```{r bootstrap-comparison-functions}
 
-# bootstrap function for comparison table
-bootstrap_comparison <- function(dataset, model_type, beta, sigma = NULL, gamma = NULL, n_boot = 10) {
-  N <- nrow(dataset)
-  boot_stats <- replicate(n_boot, {
-    boot_sample <- dataset[sample(nrow(dataset), replace = TRUE), ]
-    if (model_type == "SI") {
-      sim_df <- run_real_model(boot_sample, "SI", beta)
-    } else if (model_type == "SIR") {
-      sim_df <- run_real_model(boot_sample, "SIR", beta, gamma = gamma)
-    } else {
-      sim_df <- run_real_model(boot_sample, "SEIR", beta, sigma, gamma)
-    }
+# ---------------------------------------------------------------------------
+# uncertainty: where the confidence bands come from
+# ---------------------------------------------------------------------------
+# The bands shown in the dashboard are PARAMETER-UNCERTAINTY intervals for the
+# simulated scenario. The procedure is:
+#
+#   1. draw CI_N_DRAWS parameter sets around the values the user set,
+#   2. integrate the ODE once per draw on the same grid and from the same
+#      initial conditions as the displayed curve,
+#   3. report the per-day empirical quantiles of those trajectories.
+#
+# Nothing is smoothed and nothing is stretched to cover the point estimate.
+# (The previous version ran a loess over the quantiles and then forced
+# low <= point estimate <= high, which produced bands that no longer
+# corresponded to any quantile of the simulated distribution.)
+#
+# Draws are lognormal so they stay strictly positive and need no truncation;
+# the MEDIAN of each draw distribution is the value the user set, so the band
+# is centred on the curve that is plotted.
+rlnorm_cv <- function(n, median_val, cv) {
+  if (!is.finite(median_val) || median_val <= 0 || !is.finite(cv) || cv <= 0) {
+    return(rep(median_val, n))
+  }
+  sdlog <- sqrt(log(1 + cv^2))
+  rlnorm(n, meanlog = log(median_val), sdlog = sdlog)
+}
 
-    # calculate metrics for simulated data
-    sim_peak <- max(sim_df$I, na.rm = TRUE)
-    sim_duration <- as.numeric(max(sim_df$Date) - min(sim_df$Date))
-    sim_infections <- tail(sim_df$I, 1)
-    sim_peak_time <- as.numeric(sim_df$Date[which.max(sim_df$I)] - min(sim_df$Date))
-    
-    # calculate metrics for real data
-    real_peak <- max(sim_df$I_real, na.rm = TRUE)
-    real_duration <- as.numeric(max(sim_df$Date[!is.na(sim_df$I_real)]) -
-                     min(sim_df$Date[!is.na(sim_df$I_real)]))
-    real_infections <- tail(sim_df$I_real[!is.na(sim_df$I_real)], 1)
-    real_peak_time <- as.numeric(sim_df$Date[which.max(sim_df$I_real)] - 
-                      min(sim_df$Date[!is.na(sim_df$I_real)]))
-    
-    # calculate start times
-    sim_start <- min(sim_df$Date[sim_df$I > 0])
-    real_start <- min(sim_df$Date[!is.na(sim_df$I_real) & sim_df$I_real > 0])
-    delayed_start <- as.numeric(real_start - sim_start)
+# Coefficient of variation used for beta. With a line list we let the data
+# speak: EpiEstim gives a posterior for R(t), and its relative spread is used
+# as the relative spread of beta. Without data (simulated-only module) the
+# user-supplied CV is used directly.
+beta_cv_from_data <- function(dataset, default_cv = 0.10) {
+  if (is.null(dataset) || nrow(dataset) < 7) return(default_cv)
 
-    c(reduced_infections = round((real_infections - sim_infections), 0),
-      reduced_duration = round((real_duration - sim_duration),0),
-      reduced_peak = round((real_peak - sim_peak),0),
-      delayed_peak = round((real_peak_time - sim_peak_time),0),
-      delayed_start = round(delayed_start,0))
-  })
+  out <- tryCatch({
+    incidence_data <- dataset %>%
+      filter(!is.na(date_of_onset)) %>%
+      count(date_of_onset, name = "I") %>%
+      arrange(date_of_onset) %>%
+      complete(date_of_onset = seq(min(date_of_onset), max(date_of_onset), by = "day"),
+               fill = list(I = 0))
 
-  ci <- apply(boot_stats, 1, function(x) {
-    quantile(x, c(0.025, 0.975), na.rm = TRUE)
-  })
+    if (nrow(incidence_data) < 7) return(default_cv)
 
-  means <- rowMeans(boot_stats, na.rm = TRUE)
+    si <- as.numeric(dataset$date_of_onset - dataset$date_of_exposure)
+    si <- si[!is.na(si) & si > 0]
+    mean_si <- if (length(si) >= 5) mean(si) else 7.5
+    std_si  <- if (length(si) >= 5 && sd(si) > 0) sd(si) else 3.4
 
-  data.frame(
-    Metric = c("Reduced Infections", "Reduced Duration (days)", "Reduced Peak",
-              "Delayed Peak (days)", "Delayed Start (days)"),
-    Estimate = round(means, 2),
-    Lower_CI = round(ci[1, ], 2),
-    Upper_CI = round(ci[2, ], 2)
+    res <- EpiEstim::estimate_R(
+      incidence_data$I,
+      method = "parametric_si",
+      config = EpiEstim::make_config(list(
+        mean_si = mean_si, std_si = std_si,
+        t_start = 2, t_end = nrow(incidence_data)
+      ))
+    )
+
+    cv <- stats::median(res$R$`Std(R)` / res$R$`Mean(R)`, na.rm = TRUE)
+    if (!is.finite(cv) || cv <= 0) default_cv else min(max(cv, 0.02), 0.75)
+  }, error = function(e) default_cv)
+
+  if (is.null(out) || !is.finite(out)) default_cv else out
+}
+
+# One parameter-draw generator for both modules.
+draw_parameters <- function(model_type, beta, sigma = NULL, gamma = NULL,
+                            n_draws = CI_N_DRAWS, param_cv = 0.10, dataset = NULL) {
+  b_cv <- if (is.null(dataset)) param_cv else beta_cv_from_data(dataset, param_cv)
+
+  list(
+    beta  = rlnorm_cv(n_draws, beta, b_cv),
+    sigma = if (model_type == "SEIR" && !is.null(sigma)) rlnorm_cv(n_draws, sigma, param_cv) else rep(NA_real_, n_draws),
+    gamma = if (model_type %in% c("SIR", "SEIR") && !is.null(gamma)) rlnorm_cv(n_draws, gamma, param_cv) else rep(NA_real_, n_draws),
+    beta_cv = b_cv
   )
 }
 
-# bayesian parameter estimation using EpiEstim for R0 estimation
-bayesian_estimate_params <- function(dataset, model_type, n_samples = 100, user_beta = NULL, user_sigma = NULL, user_gamma = NULL) {
-  # estimate serial interval from data if available, else use defaults
-  if ("date_of_exposure" %in% names(dataset) && "date_of_onset" %in% names(dataset)) {
-    serial_intervals <- as.numeric(dataset$date_of_onset - dataset$date_of_exposure)
-    serial_intervals <- serial_intervals[!is.na(serial_intervals) & serial_intervals > 0]
-    
-    if (length(serial_intervals) >= 5) {
-      mean_si <- mean(serial_intervals)
-      std_si <- sd(serial_intervals)
-    } else {
-      mean_si <- 7.5
-      std_si <- 3.4
-    }
-  } else {
-    mean_si <- 7.5
-    std_si <- 3.4
+CI_PROBS <- c(0.025, 0.05, 0.125, 0.25, 0.75, 0.875, 0.95, 0.975)
+CI_NAMES <- c("ci_2.5", "ci_5", "ci_12.5", "ci_25", "ci_75", "ci_87.5", "ci_95", "ci_97.5")
+
+# Per-day quantiles of the simulated trajectories. Used identically by the
+# simulated-only module and the real-vs-simulated module.
+simulate_ci <- function(model_type, N, beta, sigma = NULL, gamma = NULL, days, init,
+                        start_date = as.Date("2020-01-01"),
+                        n_draws = CI_N_DRAWS, param_cv = 0.10,
+                        dataset = NULL, seed = 20250908) {
+
+  set.seed(seed)   # reproducible bands
+  draws <- draw_parameters(model_type, beta, sigma, gamma, n_draws, param_cv, dataset)
+
+  comps <- switch(model_type,
+                  "SI"   = c("S", "I"),
+                  "SIR"  = c("S", "I", "R"),
+                  "SEIR" = c("S", "E", "I", "R"))
+
+  n_t <- round(days) + 1
+  mats <- setNames(lapply(comps, function(x) matrix(NA_real_, nrow = n_t, ncol = n_draws)), comps)
+  dates <- start_date + seq_len(n_t) - 1
+
+  ok <- 0
+  for (i in seq_len(n_draws)) {
+    res <- tryCatch(
+      run_model(model_type, N = N,
+                beta  = draws$beta[i],
+                sigma = if (model_type == "SEIR") draws$sigma[i] else NULL,
+                gamma = if (model_type %in% c("SIR", "SEIR")) draws$gamma[i] else NULL,
+                days = days, init = init, start_date = start_date),
+      error = function(e) NULL)
+
+    if (is.null(res) || nrow(res) != n_t) next
+    for (cp in comps) mats[[cp]][, i] <- res[[cp]]
+    ok <- ok + 1
   }
-  
-  # get incidence data
-  incidence_data <- dataset %>%
-    arrange(date_of_onset) %>%
-    group_by(date_of_onset) %>%
-    summarise(I = n()) %>%
-    complete(date_of_onset = seq(min(date_of_onset), max(date_of_onset), by = "day"), 
-             fill = list(I = 0))
-  
-  # use EpiEstim to estimate R0 with uncertainty
-  if (nrow(incidence_data) >= 7) {
-    tryCatch({
-      n_days <- nrow(incidence_data)
-      t_start <- 2
-      t_end <- n_days
-      
-      R_estimates <- EpiEstim::estimate_R(
-        incidence_data$I, 
-        method = "parametric_si",
-        config = EpiEstim::make_config(list(
-          mean_si = mean_si, 
-          std_si = std_si,
-          n1 = 1000,
-          n2 = 100,
-          t_start = t_start,
-          t_end = t_end
-        ))
-      )
-      
-      R0_samples <- sample(R_estimates$R$`Mean(R)`, n_samples, replace = TRUE)
-      
-      # use user-provided gamma or estimate from data
-      if (!is.null(user_gamma)) {
-        gamma <- user_gamma
-      } else if ("date_of_onset" %in% names(dataset) && "recovery_date" %in% names(dataset)) {
-        infectious_periods <- as.numeric(dataset$recovery_date - dataset$date_of_onset)
-        infectious_periods <- infectious_periods[!is.na(infectious_periods) & infectious_periods > 0]
-        gamma <- if (length(infectious_periods) >= 3) 1 / mean(infectious_periods) else 0.14
-      } else {
-        gamma <- 0.14
-      }
-      
-      # use user-provided beta if provided, else derive from R0
-      if (!is.null(user_beta)) {
-        beta_samples <- rnorm(n_samples, user_beta, user_beta * 0.1)  # Add 10% noise
-        beta_samples <- pmax(0.1, pmin(3.0, beta_samples))
-      } else {
-        beta_samples <- R0_samples * gamma
-      }
-      
-      gamma_samples <- rnorm(n_samples, gamma, gamma * 0.2)
-      gamma_samples <- pmax(0.05, pmin(0.5, gamma_samples))
-      
-      if (model_type == "SEIR") {
-        if (!is.null(user_sigma)) {
-          sigma_mean <- user_sigma
-        } else if ("date_of_exposure" %in% names(dataset)) {
-          incubation_periods <- as.numeric(dataset$date_of_onset - dataset$date_of_exposure)
-          incubation_periods <- incubation_periods[!is.na(incubation_periods) & incubation_periods > 0]
-          sigma_mean <- if (length(incubation_periods) >= 3) 1 / mean(incubation_periods) else 0.2
-        } else {
-          sigma_mean <- 0.2
-        }
-        sigma_samples <- rnorm(n_samples, sigma_mean, sigma_mean * 0.3)
-        sigma_samples <- pmax(0.1, pmin(1.0, sigma_samples))
-      } else {
-        sigma_samples <- rep(0.2, n_samples)
-      }
-      
-      return(list(
-        beta_samples = beta_samples,
-        gamma_samples = gamma_samples,
-        sigma_samples = sigma_samples,
-        R0_samples = R0_samples
-      ))
-      
-    }, error = function(e) {
-      return(fallback_param_estimation(dataset, model_type, n_samples, user_beta, user_sigma, user_gamma))
-    })
-  } else {
-    return(fallback_param_estimation(dataset, model_type, n_samples, user_beta, user_sigma, user_gamma))
-  }
+
+  if (ok < 10) return(NULL)   # not enough draws to quote a quantile honestly
+
+  ci <- lapply(comps, function(cp) {
+    q <- t(apply(mats[[cp]], 1, function(x) {
+      x <- x[is.finite(x)]
+      if (length(x) < 10) rep(NA_real_, length(CI_PROBS))
+      else stats::quantile(x, probs = CI_PROBS, names = FALSE)
+    }))
+    d <- as.data.frame(q)
+    names(d) <- CI_NAMES
+    d$Date <- dates
+    d
+  })
+  names(ci) <- comps
+
+  attr(ci, "n_draws")  <- ok
+  attr(ci, "beta_cv")  <- draws$beta_cv
+  attr(ci, "param_cv") <- param_cv
+  ci
 }
 
-# if insufficient sample size use this as a fallback
+# ---------------------------------------------------------------------------
+# comparative epidemiological metrics
+# ---------------------------------------------------------------------------
+# Both sides of the comparison now use the SAME definitions, the same time
+# origin (day 0 = first day of the shared window) and the same population N.
+#
+#   Cumulative infections  everyone who left S over the window
+#                          simulated: N - S(last day);  observed: total cases
+#   Peak infectious        highest number simultaneously infectious
+#   Day of peak            days from the start of the shared window
+#   Peak daily incidence   largest number of NEW infections in a single day
+#   Outbreak duration      first to last day with at least one new infection
+#   Attack rate            cumulative infections / N
+#
+# Previously "infections" was read as tail(I, 1) - the infectious prevalence on
+# the final day, not a cumulative count - and both durations were computed as
+# max(Date) - min(Date) on a shared grid, so "Reduced Duration" was always 0.
+series_metrics <- function(days, susceptible, prevalence, incidence, N) {
+  prevalence  <- as.numeric(prevalence)
+  incidence   <- as.numeric(incidence)
+  susceptible <- as.numeric(susceptible)
+  days        <- as.numeric(days)
 
-fallback_param_estimation <- function(dataset, model_type, n_samples = 100, user_beta = NULL, user_sigma = NULL, user_gamma = NULL) {
-  total_cases <- nrow(dataset)
-  
-  beta_mean <- if (!is.null(user_beta)) user_beta else min(2.0, total_cases / 20)
-  beta_samples <- rnorm(n_samples, beta_mean, beta_mean * 0.4)
-  beta_samples <- pmax(0.1, pmin(3.0, beta_samples))
-  
-  gamma_mean <- if (!is.null(user_gamma)) user_gamma else 0.14
-  gamma_samples <- rnorm(n_samples, gamma_mean, gamma_mean * 0.3)
-  gamma_samples <- pmax(0.05, pmin(0.5, gamma_samples))
-  
-  sigma_mean <- if (!is.null(user_sigma)) user_sigma else 0.2
-  sigma_samples <- rnorm(n_samples, sigma_mean, sigma_mean * 0.3)
-  sigma_samples <- pmax(0.1, pmin(1.0, sigma_samples))
-  
-  R0_samples <- beta_samples / gamma_samples
-  
-  return(list(
-    beta_samples = beta_samples,
-    gamma_samples = gamma_samples,
-    sigma_samples = sigma_samples,
-    R0_samples = R0_samples
-  ))
+  # Cumulative infections is read off the susceptible compartment on BOTH
+  # sides - N minus whoever is still susceptible at the end. Because the
+  # simulated run starts from the same S as the observed series, the two are
+  # directly comparable and the people already infected on day 1 are counted
+  # once on each side rather than once on one side only.
+  cum_inf <- N - tail(susceptible[is.finite(susceptible)], 1)
+  active  <- which(incidence >= 1)
+
+  c(
+    cumulative_infections = cum_inf,
+    peak_prevalence       = if (all(is.na(prevalence))) NA_real_ else max(prevalence, na.rm = TRUE),
+    peak_prevalence_day   = if (all(is.na(prevalence))) NA_real_ else days[which.max(prevalence)],
+    peak_incidence        = if (length(incidence) == 0) NA_real_ else max(incidence, na.rm = TRUE),
+    peak_incidence_day    = if (length(incidence) == 0) NA_real_ else days[which.max(incidence)],
+    duration              = if (length(active) == 0) 0 else days[max(active)] - days[min(active)],
+    attack_rate           = 100 * cum_inf / N
+  )
 }
 
-# function to run bayesian bootsrap estimates
-run_bayesian_bootstrap_ci <- function(dataset, model_type, beta, sigma = NULL, gamma = NULL, n_boot = 10, N_override = NULL) {
+simulated_metrics <- function(sim_df, N) {
+  series_metrics(sim_df$time, sim_df$S, sim_df$I, sim_df$new_infections, N)
+}
+
+observed_metrics <- function(sim_df, N) {
+  ok <- !is.na(sim_df$I_real)
+  series_metrics(sim_df$time[ok], sim_df$S_real[ok], sim_df$I_real[ok],
+                 sim_df$new_infections_real[ok], N)
+}
+
+METRIC_LABELS <- c(
+  cumulative_infections = "Cumulative infections",
+  peak_prevalence       = "Peak infectious (prevalence)",
+  peak_prevalence_day   = "Day of peak infectious",
+  peak_incidence        = "Peak daily new infections",
+  peak_incidence_day    = "Day of peak new infections",
+  duration              = "Outbreak duration (days)",
+  attack_rate           = "Attack rate (% of N)"
+)
+
+METRIC_DESCRIPTIONS <- c(
+  cumulative_infections = "Everyone infected by the end of the window (N - final susceptible)",
+  peak_prevalence       = "Largest number infectious on any single day",
+  peak_prevalence_day   = "Days from the start of the shared window to that peak",
+  peak_incidence        = "Largest number of new infections in a single day",
+  peak_incidence_day    = "Days from the start of the shared window to that peak",
+  duration              = "First to last day with at least one new infection",
+  attack_rate           = "Cumulative infections as a percentage of the population at risk"
+)
+
+# Comparison table. The OBSERVED column is a single count from the line list
+# and carries no interval. The SIMULATED column is the curve that is actually
+# plotted - the run at the parameters the user set - so the Comparison tab, the
+# Model Parameters tab and the chart cannot disagree; its 95% interval comes
+# from the same parameter draws that produce the confidence bands.
+comparison_table_data <- function(dataset, model_type, beta, sigma = NULL, gamma = NULL,
+                                  N, init, extra_days = 0,
+                                  n_draws = CI_N_DRAWS, param_cv = 0.10, seed = 20250908,
+                                  event = "default") {
+
+  ref <- run_real_model(dataset, model_type, beta, sigma, gamma,
+                        N = N, init = init, extra_days = extra_days, event = event)
+
+  obs <- observed_metrics(ref, N)
+  win <- attr(ref, "window")
+  days <- length(win$dates) - 1
+
+  set.seed(seed)
+  draws <- draw_parameters(model_type, beta, sigma, gamma, n_draws, param_cv, dataset)
+
+  sim_mat <- matrix(NA_real_, nrow = n_draws, ncol = length(obs),
+                    dimnames = list(NULL, names(obs)))
+
+  for (i in seq_len(n_draws)) {
+    res <- tryCatch(
+      run_model(model_type, N = N,
+                beta  = draws$beta[i],
+                sigma = if (model_type == "SEIR") draws$sigma[i] else NULL,
+                gamma = if (model_type %in% c("SIR", "SEIR")) draws$gamma[i] else NULL,
+                days = days, init = init, start_date = win$start_date),
+      error = function(e) NULL)
+    if (is.null(res)) next
+    sim_mat[i, ] <- simulated_metrics(res, N)
+  }
+
+  # point estimate = the displayed run, NOT the median of the draws
+  sim_pt <- simulated_metrics(ref, N)
+  sim_lo <- apply(sim_mat, 2, stats::quantile, probs = 0.025, na.rm = TRUE, names = FALSE)
+  sim_hi <- apply(sim_mat, 2, stats::quantile, probs = 0.975, na.rm = TRUE, names = FALSE)
+
+  keys <- names(METRIC_LABELS)
+  rnd <- function(k, v) if (k == "attack_rate") round(v, 1) else round(v, 0)
+
+  data.frame(
+    Metric      = unname(METRIC_LABELS[keys]),
+    Description = unname(METRIC_DESCRIPTIONS[keys]),
+    Observed    = vapply(keys, function(k) rnd(k, obs[[k]]), numeric(1)),
+    Simulated   = vapply(keys, function(k) rnd(k, sim_pt[[k]]), numeric(1)),
+    `Simulated 95% CI` = vapply(keys, function(k)
+      paste0(rnd(k, sim_lo[[k]]), " to ", rnd(k, sim_hi[[k]])), character(1)),
+    Difference  = vapply(keys, function(k) rnd(k, obs[[k]] - sim_pt[[k]]), numeric(1)),
+    row.names = NULL, check.names = FALSE
+  )
+}
+
+# Kept so older calls keep working; everything now routes through
+# reconstruct_observed() so no second reconstruction can drift from it.
+calculate_compartment_counts <- function(dataset, model_type, dates, N_override = NULL,
+                                         gamma = NULL, event = "default") {
   N <- if (!is.null(N_override)) N_override else nrow(dataset)
-  
-  # use bayesian_estimate_params to generate parameter samples, respecting user inputs
-  param_samples <- bayesian_estimate_params(dataset, model_type, n_samples = n_boot, 
-                                           user_beta = beta, user_sigma = sigma, user_gamma = gamma)
-  
-  beta_samples <- param_samples$beta_samples
-  gamma_samples <- param_samples$gamma_samples
-  sigma_samples <- param_samples$sigma_samples
-  
-  # reference simulation using median of parameter samples
-  ref_beta <- median(beta_samples, na.rm = TRUE)
-  ref_gamma <- if (model_type %in% c("SIR", "SEIR")) median(gamma_samples, na.rm = TRUE) else NULL
-  ref_sigma <- if (model_type == "SEIR") median(sigma_samples, na.rm = TRUE) else NULL
-  
-  reference_result <- if (model_type == "SI") {
-    run_real_model(dataset, "SI", ref_beta, N_override = N)
-  } else if (model_type == "SIR") {
-    run_real_model(dataset, "SIR", ref_beta, gamma = ref_gamma, N_override = N)
-  } else {
-    run_real_model(dataset, "SEIR", ref_beta, ref_sigma, ref_gamma, N_override = N)
-  }
-  
-  reference_dates <- reference_result$Date
-  n_days <- length(reference_dates)
-  
-  # run bootstrap simulations
-  bootstrap_replicates <- list()
-  valid_replicates <- 0
-  
-  for (i in 1:n_boot) {
-    tryCatch({
-      # add slight noise to initial conditions for SI model to ensure variability
-      if (model_type == "SI") {
-        boot_dataset <- dataset
-        if ("date_of_exposure" %in% names(boot_dataset)) {
-          # perturb exposure dates slightly
-          boot_dataset$date_of_exposure <- boot_dataset$date_of_exposure + 
-            sample(c(-1, 0, 1), nrow(boot_dataset), replace = TRUE)
-        }
-        result <- run_real_model(boot_dataset, "SI", beta_samples[i], N_override = N)
-      } else if (model_type == "SIR") {
-        result <- run_real_model(dataset, "SIR", beta_samples[i], 
-                                gamma = gamma_samples[i], N_override = N)
-      } else {
-        result <- run_real_model(dataset, "SEIR", beta_samples[i], 
-                                sigma_samples[i], gamma_samples[i], 
-                                N_override = N)
-      }
-      
-      # align with reference time frame
-      result <- merge(data.frame(Date = reference_dates), result, by = "Date", all.x = TRUE)
-      
-      # fill missing values
-      result <- result %>%
-        fill(-Date, .direction = "down") %>%
-        fill(-Date, .direction = "up")
-      
-      result[is.na(result)] <- 0
-      bootstrap_replicates[[length(bootstrap_replicates) + 1]] <- result
-      valid_replicates <- valid_replicates + 1
-    }, error = function(e) {
-      message("Bootstrap iteration ", i, " failed: ", e$message)
-    })
-  }
-  
-  # check if enough valid replicates
-  if (valid_replicates < 3) {
-    warning("Insufficient valid bootstrap replicates (", valid_replicates, "). Using perturbed reference result.")
-    bootstrap_replicates <- lapply(1:3, function(i) {
-      perturbed <- reference_result
-      perturbed$S <- pmax(0, perturbed$S + rnorm(nrow(perturbed), 0, N * 0.05))
-      perturbed$I <- pmax(0, perturbed$I + rnorm(nrow(perturbed), 0, N * 0.05))
-      if ("R" %in% names(perturbed)) perturbed$R <- pmax(0, perturbed$R + rnorm(nrow(perturbed), 0, N * 0.05))
-      if ("E" %in% names(perturbed)) perturbed$E <- pmax(0, perturbed$E + rnorm(nrow(perturbed), 0, N * 0.05))
-      perturbed
-    })
-    valid_replicates <- 3
-  }
-  
-  # calculate quantiles for each compartment
-  compartments <- c("S", "I", "R", "E")
-  available_compartments <- intersect(compartments, names(bootstrap_replicates[[1]]))
-  
-  ci_results <- list()
-  
-  for (comp in available_compartments) {
-    comp_data <- lapply(bootstrap_replicates, function(df) {
-      df[[comp]]
-    })
-    
-    comp_matrix <- do.call(cbind, comp_data)
-    
-    quantiles <- apply(comp_matrix, 1, function(x) {
-      x_clean <- x[!is.na(x) & is.finite(x)]
-      if (length(x_clean) >= 3) {
-        quantile(x_clean, probs = c(0.025, 0.05, 0.125, 0.25, 0.75, 0.875, 0.95, 0.975), 
-                na.rm = TRUE, names = FALSE)
-      } else {
-        ref_vals <- reference_result[[comp]][1:length(x)]
-        ref_vals + rnorm(length(ref_vals), 0, max(1, max(ref_vals, na.rm = TRUE) * 0.05))  # Add small noise
-      }
-    })
-    
-    ci_results[[comp]] <- as.data.frame(t(quantiles))
-    names(ci_results[[comp]]) <- c("ci_2.5", "ci_5", "ci_12.5", "ci_25", "ci_75", "ci_87.5", "ci_95", "ci_97.5")
-    ci_results[[comp]]$Date <- reference_dates
-  }
-  
-  return(ci_results)
-}
-
-# get ci estimates by sampling real data
-run_real_data_ci <- function(dataset, model_type, n_boot = 10, N_override = NULL, gamma = NULL) {
-  N <- if (!is.null(N_override)) N_override else nrow(dataset)
-  
-  if (is.null(dataset) || nrow(dataset) == 0) {
-    return(NULL)
-  }
-  
-  if (model_type == "SI") {
-    exposures <- dataset$date_of_exposure[!is.na(dataset$date_of_exposure)]
-    if (length(exposures) == 0) return(NULL)
-    start_date <- min(exposures)
-    end_date <- max(exposures) + 5
-  } else if (model_type == "SIR") {
-    onsets <- dataset$date_of_onset[!is.na(dataset$date_of_onset)]
-    if (length(onsets) == 0) return(NULL)
-    start_date <- min(onsets)
-    recovery_days <- if (!is.null(gamma)) ceiling(1 / gamma) else 7
-    end_date <- max(onsets) + recovery_days + 5
-  } else if (model_type == "SEIR") {
-    exposures <- dataset$date_of_exposure[!is.na(dataset$date_of_exposure)]
-    onsets <- dataset$date_of_onset[!is.na(dataset$date_of_onset)]
-    if (length(exposures) == 0 || length(onsets) == 0) return(NULL)
-    start_date <- min(exposures)
-    recovery_days <- if (!is.null(gamma)) ceiling(1 / gamma) else 7
-    end_date <- max(onsets) + recovery_days + 5
-  }
-  
-  dates <- seq.Date(start_date, end_date, by = "day")
-  all_dates <- dates
-  
-  ci_results <- list()
-  
-  for (comp in c("S", "E", "I", "R")) {
-    comp_matrix <- matrix(NA, nrow = length(all_dates), ncol = n_boot)
-    valid_count <- 0
-    
-    for (i in 1:n_boot) {
-      tryCatch({
-        case_ids <- sample(nrow(dataset), replace = TRUE)
-        boot_sample <- dataset[case_ids, ]
-        
-        comp_counts <- calculate_compartment_counts(boot_sample, model_type, all_dates, N_override = N, gamma = gamma)
-        
-        comp_matrix[, i] <- comp_counts[[comp]]
-        valid_count <- valid_count + 1
-      }, error = function(e) {
-        message("Bootstrap iteration ", i, " failed: ", e$message)
-        comp_matrix[, i] <- NA
-      })
-    }
-    
-    if (valid_count > 0) {
-      quantiles <- apply(comp_matrix, 1, function(x) {
-        x_clean <- x[!is.na(x) & is.finite(x)]
-        if (length(x_clean) > 0) {
-          quantile(x_clean, probs = c(0.025, 0.05, 0.125, 0.25, 0.75, 0.875, 0.95, 0.975), 
-                  na.rm = TRUE, names = FALSE)
-        } else {
-          rep(NA, 8)
-        }
-      })
-      
-      ci_results[[comp]] <- as.data.frame(t(quantiles))
-      names(ci_results[[comp]]) <- c("ci_2.5", "ci_5", "ci_12.5", "ci_25", "ci_75", "ci_87.5", "ci_95", "ci_97.5")
-      ci_results[[comp]]$Date <- all_dates
-    } else {
-      ci_results[[comp]] <- NULL
-    }
-  }
-  
-  if (all(sapply(ci_results, is.null))) {
-    return(NULL)
-  }
-  
-  return(ci_results)
-}
-
-# helper function to calculate compartment counts
-calculate_compartment_counts <- function(dataset, model_type, dates, N_override = NULL, gamma = NULL) {
-  N <- if (!is.null(N_override)) N_override else nrow(dataset)
-  results <- data.frame(Date = dates, S = NA, E = NA, I = NA, R = NA)
-  
-  dates <- as.Date(dates)
-  
-  recovery_days <- if (!is.null(gamma)) ceiling(1 / gamma) else 7
-  
-  if (model_type == "SI") {
-    exposure_counts <- dataset %>%
-      mutate(date_of_exposure = as.Date(date_of_exposure)) %>%
-      group_by(date_of_exposure) %>%
-      summarise(new_E = n()) %>%
-      complete(date_of_exposure = dates, fill = list(new_E = 0))
-    
-    results$S <- N - cumsum(exposure_counts$new_E)
-    results$I <- cumsum(exposure_counts$new_E)
-    
-  } else if (model_type == "SIR") {
-    onset_counts <- dataset %>%
-      mutate(date_of_onset = as.Date(date_of_onset)) %>%
-      group_by(date_of_onset) %>%
-      summarise(new_I = n()) %>%
-      complete(date_of_onset = dates, fill = list(new_I = 0))
-    
-    recovery_data <- dataset %>%
-      mutate(
-        date_of_onset = as.Date(date_of_onset),
-        recovery_date = ifelse(!is.na(date_of_onset), date_of_onset + recovery_days, NA)
-      ) %>%
-      filter(!is.na(recovery_date))
-    
-    recovery_counts <- recovery_data %>%
-      mutate(recovery_date = as.Date(recovery_date)) %>%
-      group_by(recovery_date) %>%
-      summarise(new_R = n()) %>%
-      complete(recovery_date = dates, fill = list(new_R = 0))
-    
-    results$S <- NA
-    results$I <- NA
-    results$R <- NA
-    
-    results$S[1] <- N
-    results$I[1] <- 0
-    results$R[1] <- 0
-    
-    for (t in 2:length(dates)) {
-      results$S[t] <- results$S[t-1] - onset_counts$new_I[t]
-      results$I[t] <- results$I[t-1] + onset_counts$new_I[t] - recovery_counts$new_R[t]
-      results$R[t] <- results$R[t-1] + recovery_counts$new_R[t]
-    }
-    
-  } else if (model_type == "SEIR") {
-    exposure_counts <- dataset %>%
-      mutate(date_of_exposure = as.Date(date_of_exposure)) %>%
-      group_by(date_of_exposure) %>%
-      summarise(new_E = n()) %>%
-      complete(date_of_exposure = dates, fill = list(new_E = 0))
-    
-    onset_counts <- dataset %>%
-      mutate(date_of_onset = as.Date(date_of_onset)) %>%
-      group_by(date_of_onset) %>%
-      summarise(new_I = n()) %>%
-      complete(date_of_onset = dates, fill = list(new_I = 0))
-    
-    recovery_data <- dataset %>%
-      mutate(
-        date_of_onset = as.Date(date_of_onset),
-        recovery_date = ifelse(!is.na(date_of_onset), date_of_onset + recovery_days, NA)
-      ) %>%
-      filter(!is.na(recovery_date))
-    
-    recovery_counts <- recovery_data %>%
-      mutate(recovery_date = as.Date(recovery_date)) %>%
-      group_by(recovery_date) %>%
-      summarise(new_R = n()) %>%
-      complete(recovery_date = dates, fill = list(new_R = 0))
-    
-    results$S <- NA
-    results$E <- NA
-    results$I <- NA
-    results$R <- NA
-    
-    results$S[1] <- N
-    results$E[1] <- 0
-    results$I[1] <- 0
-    results$R[1] <- 0
-    
-    for (t in 2:length(dates)) {
-      results$S[t] <- results$S[t-1] - exposure_counts$new_E[t]
-      results$E[t] <- results$E[t-1] + exposure_counts$new_E[t] - onset_counts$new_I[t]
-      results$I[t] <- results$I[t-1] + onset_counts$new_I[t] - recovery_counts$new_R[t]
-      results$R[t] <- results$R[t-1] + recovery_counts$new_R[t]
-    }
-  }
-  
-  results[,-1] <- lapply(results[,-1], function(x) pmax(0, x, na.rm = TRUE))
-  
-  return(results)
+  obs <- reconstruct_observed(dataset, model_type, dates, N, gamma, event)
+  data.frame(Date = obs$Date, S = obs$S_real, E = obs$E_real,
+             I = obs$I_real, R = obs$R_real)
 }
 
 ```
@@ -1036,12 +1064,12 @@ si_viz <- function(results, separate = FALSE, simulation_only = FALSE) {
         lineWidth = 2,
         marker = list(enabled = FALSE)
       ) %>%
-      hc_title(text = "Susceptible Population", style = list(fontSize = "18px", fontFamily = "Tw Cen MT", fontWeight = "bold")) %>%
+      hc_title(text = "Susceptible Population", style = list(fontSize = "18px", fontFamily = APP_FONT, fontWeight = "bold")) %>%
       hc_xAxis(
-        title = list(text = "Time From Epidemic Onset (Days)", style = list(fontFamily = "Tw Cen MT")),
+        title = list(text = "Time From Epidemic Onset (Days)", style = list(fontFamily = APP_FONT)),
         labels = list(format = "{value:.0f}")
       ) %>%
-      hc_yAxis(title = list(text = "Number of Individuals", style = list(fontFamily = "Tw Cen MT"))) %>%
+      hc_yAxis(title = list(text = "Number of Individuals", style = list(fontFamily = APP_FONT))) %>%
       hc_tooltip(
         shared = TRUE,
         crosshairs = TRUE,
@@ -1064,7 +1092,7 @@ si_viz <- function(results, separate = FALSE, simulation_only = FALSE) {
       ) %>%
       hc_chart(
         backgroundColor = "#FBFBFB",
-        style = list(fontFamily = "Tw Cen MT")
+        style = list(fontFamily = APP_FONT)
       )
     
     if (!simulation_only) {
@@ -1104,19 +1132,19 @@ si_viz <- function(results, separate = FALSE, simulation_only = FALSE) {
         lineWidth = 2,
         marker = list(enabled = FALSE)
       ) %>%
-      hc_title(text = "SI Model", style = list(fontSize = "18px", fontFamily = "Tw Cen MT", fontWeight = "bold")) %>%
+      hc_title(text = "SI Model", style = list(fontSize = "18px", fontFamily = APP_FONT, fontWeight = "bold")) %>%
       hc_xAxis(
-        title = list(text = "Time From Epidemic Onset (Days)", style = list(fontFamily = "Tw Cen MT")),
+        title = list(text = "Time From Epidemic Onset (Days)", style = list(fontFamily = APP_FONT)),
         labels = list(format = "{value:.0f}")
       ) %>%
-      hc_yAxis(title = list(text = "Number of Individuals", style = list(fontFamily = "Tw Cen MT"))) %>%
+      hc_yAxis(title = list(text = "Number of Individuals", style = list(fontFamily = APP_FONT))) %>%
       hc_tooltip(
         shared = TRUE,
         crosshairs = TRUE,
         headerFormat = "<b>Day {point.x:.0f}</b><br/>",
         pointFormat = "{series.name}: <b>{point.y:.0f}</b><br/>"
       ) %>%
-      hc_legend(itemStyle = list(fontFamily = "Tw Cen MT")) %>%
+      hc_legend(itemStyle = list(fontFamily = APP_FONT)) %>%
       hc_exporting(
         enabled = TRUE,
         buttons = list(
@@ -1132,7 +1160,7 @@ si_viz <- function(results, separate = FALSE, simulation_only = FALSE) {
       ) %>%
       hc_chart(
         backgroundColor = "#FBFBFB",
-        style = list(fontFamily = "Tw Cen MT")
+        style = list(fontFamily = APP_FONT)
       )
     
     if (!simulation_only) {
@@ -1198,12 +1226,12 @@ sir_viz <- function(results, separate = FALSE, simulation_only = FALSE) {
         lineWidth = 2,
         marker = list(enabled = FALSE)
       ) %>%
-      hc_title(text = "Susceptible Population", style = list(fontSize = "18px", fontFamily = "Tw Cen MT", fontWeight = "bold")) %>%
+      hc_title(text = "Susceptible Population", style = list(fontSize = "18px", fontFamily = APP_FONT, fontWeight = "bold")) %>%
       hc_xAxis(
-        title = list(text = "Time From Epidemic Onset (Days)", style = list(fontFamily = "Tw Cen MT")),
+        title = list(text = "Time From Epidemic Onset (Days)", style = list(fontFamily = APP_FONT)),
         labels = list(format = "{value:.0f}")
       ) %>%
-      hc_yAxis(title = list(text = "Number of Individuals", style = list(fontFamily = "Tw Cen MT"))) %>%
+      hc_yAxis(title = list(text = "Number of Individuals", style = list(fontFamily = APP_FONT))) %>%
       hc_tooltip(
         shared = TRUE,
         crosshairs = TRUE,
@@ -1226,7 +1254,7 @@ sir_viz <- function(results, separate = FALSE, simulation_only = FALSE) {
       ) %>%
       hc_chart(
         backgroundColor = "#FBFBFB",
-        style = list(fontFamily = "Tw Cen MT")
+        style = list(fontFamily = APP_FONT)
       )
     
     if (!simulation_only) {
@@ -1276,19 +1304,19 @@ sir_viz <- function(results, separate = FALSE, simulation_only = FALSE) {
         lineWidth = 2,
         marker = list(enabled = FALSE)
       ) %>%
-      hc_title(text = "SIR Model", style = list(fontSize = "18px", fontFamily = "Tw Cen MT", fontWeight = "bold")) %>%
+      hc_title(text = "SIR Model", style = list(fontSize = "18px", fontFamily = APP_FONT, fontWeight = "bold")) %>%
       hc_xAxis(
-        title = list(text = "Time From Epidemic Onset (Days)", style = list(fontFamily = "Tw Cen MT")),
+        title = list(text = "Time From Epidemic Onset (Days)", style = list(fontFamily = APP_FONT)),
         labels = list(format = "{value:.0f}")
       ) %>%
-      hc_yAxis(title = list(text = "Number of Individuals", style = list(fontFamily = "Tw Cen MT"))) %>%
+      hc_yAxis(title = list(text = "Number of Individuals", style = list(fontFamily = APP_FONT))) %>%
       hc_tooltip(
         shared = TRUE,
         crosshairs = TRUE,
         headerFormat = "<b>Day {point.x:.0f}</b><br/>",
         pointFormat = "{series.name}: <b>{point.y:.0f}</b><br/>"
       ) %>%
-      hc_legend(itemStyle = list(fontFamily = "Tw Cen MT")) %>%
+      hc_legend(itemStyle = list(fontFamily = APP_FONT)) %>%
       hc_exporting(
         enabled = TRUE,
         buttons = list(
@@ -1304,7 +1332,7 @@ sir_viz <- function(results, separate = FALSE, simulation_only = FALSE) {
       ) %>%
       hc_chart(
         backgroundColor = "#FBFBFB",
-        style = list(fontFamily = "Tw Cen MT")
+        style = list(fontFamily = APP_FONT)
       )
     
     if (!simulation_only) {
@@ -1380,12 +1408,12 @@ seir_viz <- function(results, separate = FALSE, simulation_only = FALSE) {
         lineWidth = 2,
         marker = list(enabled = FALSE)
       ) %>%
-      hc_title(text = "Susceptible Population", style = list(fontSize = "18px", fontFamily = "Tw Cen MT", fontWeight = "bold")) %>%
+      hc_title(text = "Susceptible Population", style = list(fontSize = "18px", fontFamily = APP_FONT, fontWeight = "bold")) %>%
       hc_xAxis(
-        title = list(text = "Time From Epidemic Onset (Days)", style = list(fontFamily = "Tw Cen MT")),
+        title = list(text = "Time From Epidemic Onset (Days)", style = list(fontFamily = APP_FONT)),
         labels = list(format = "{value:.0f}")
       ) %>%
-      hc_yAxis(title = list(text = "Number of Individuals", style = list(fontFamily = "Tw Cen MT"))) %>%
+      hc_yAxis(title = list(text = "Number of Individuals", style = list(fontFamily = APP_FONT))) %>%
       hc_tooltip(
         shared = TRUE,
         crosshairs = TRUE,
@@ -1408,7 +1436,7 @@ seir_viz <- function(results, separate = FALSE, simulation_only = FALSE) {
       ) %>%
       hc_chart(
         backgroundColor = "#FBFBFB",
-        style = list(fontFamily = "Tw Cen MT")
+        style = list(fontFamily = APP_FONT)
       )
     
     if (!simulation_only) {
@@ -1468,19 +1496,19 @@ seir_viz <- function(results, separate = FALSE, simulation_only = FALSE) {
         lineWidth = 2,
         marker = list(enabled = FALSE)
       ) %>%
-      hc_title(text = "SEIR Model", style = list(fontSize = "18px", fontFamily = "Tw Cen MT", fontWeight = "bold")) %>%
+      hc_title(text = "SEIR Model", style = list(fontSize = "18px", fontFamily = APP_FONT, fontWeight = "bold")) %>%
       hc_xAxis(
-        title = list(text = "Time From Epidemic Onset (Days)", style = list(fontFamily = "Tw Cen MT")),
+        title = list(text = "Time From Epidemic Onset (Days)", style = list(fontFamily = APP_FONT)),
         labels = list(format = "{value:.0f}")
       ) %>%
-      hc_yAxis(title = list(text = "Number of Individuals", style = list(fontFamily = "Tw Cen MT"))) %>%
+      hc_yAxis(title = list(text = "Number of Individuals", style = list(fontFamily = APP_FONT))) %>%
       hc_tooltip(
         shared = TRUE,
         crosshairs = TRUE,
         headerFormat = "<b>Day {point.x:.0f}</b><br/>",
         pointFormat = "{series.name}: <b>{point.y:.0f}</b><br/>"
       ) %>%
-      hc_legend(itemStyle = list(fontFamily = "Tw Cen MT")) %>%
+      hc_legend(itemStyle = list(fontFamily = APP_FONT)) %>%
       hc_exporting(
         enabled = TRUE,
         buttons = list(
@@ -1496,7 +1524,7 @@ seir_viz <- function(results, separate = FALSE, simulation_only = FALSE) {
       ) %>%
       hc_chart(
         backgroundColor = "#FBFBFB",
-        style = list(fontFamily = "Tw Cen MT")
+        style = list(fontFamily = APP_FONT)
       )
     
     if (!simulation_only) {
@@ -1547,9 +1575,17 @@ seir_viz <- function(results, separate = FALSE, simulation_only = FALSE) {
   }
 }
 
-compartment_viz <- function(results, compartment, simulation_only = FALSE, 
-                           bootstrap_ci = NULL, real_data_ci = NULL,
-                           show_ci = list(ci_95 = FALSE, ci_90 = FALSE, ci_75 = FALSE, ci_50 = FALSE)) {
+# ---------------------------------------------------------------------------
+# single-compartment chart
+# ---------------------------------------------------------------------------
+# Confidence bands belong to the SIMULATED scenario only, in both modules.
+# The observed line is a count from the line list, not an estimate, so it is
+# drawn without an interval (and the "Show confidence intervals for" selector
+# that used to offer Real / Both / Simulated is gone).
+compartment_viz <- function(results, compartment, simulation_only = FALSE,
+                            sim_ci = NULL,
+                            show_ci = list(ci_95 = FALSE, ci_90 = FALSE, ci_75 = FALSE, ci_50 = FALSE)) {
+
   if (!is.null(results$Date) && all(!is.na(results$Date)) && inherits(results$Date, "Date")) {
     min_date <- min(results$Date, na.rm = TRUE)
     results <- results %>%
@@ -1558,48 +1594,53 @@ compartment_viz <- function(results, compartment, simulation_only = FALSE,
     results <- results %>%
       mutate(Days = row_number() - 1)
   }
-  
+
   comp_colors <- c(
     "S" = "#1f77b4",
-    "E" = "#a51ebd", 
+    "E" = "#a51ebd",
     "I" = "#d62728",
     "R" = "#2ca02c"
   )
-  
+
   comp_name <- switch(compartment,
                      "susceptible" = "S",
                      "exposed" = "E",
                      "infected" = "I",
                      "recovered" = "R")
-  
+
   comp_title <- switch(compartment,
                       "susceptible" = "Susceptible",
                       "exposed" = "Exposed",
                       "infected" = "Infected",
                       "recovered" = "Recovered")
-  
-  if (simulation_only) {
-    long_data <- results %>%
-      select(Days, !!sym(comp_name)) %>%
-      pivot_longer(cols = c(!!sym(comp_name)), names_to = "Compartment", values_to = "Count") %>%
-      mutate(Type = "Simulated")
-  } else {
-    real_col <- paste0(comp_name, "_real")
+
+  if (is.null(comp_name) || !comp_name %in% names(results)) return(highchart())
+
+  real_col <- paste0(comp_name, "_real")
+  has_real <- !simulation_only && real_col %in% names(results) &&
+              any(!is.na(results[[real_col]]))
+
+  if (has_real) {
     long_data <- results %>%
       select(Days, !!sym(comp_name), !!sym(real_col)) %>%
       pivot_longer(cols = c(!!sym(comp_name), !!sym(real_col)), names_to = "Compartment", values_to = "Count") %>%
       mutate(Type = ifelse(Compartment == comp_name, "Simulated", "Real"),
              Compartment = gsub("_real", "", Compartment))
+  } else {
+    long_data <- results %>%
+      select(Days, !!sym(comp_name)) %>%
+      pivot_longer(cols = c(!!sym(comp_name)), names_to = "Compartment", values_to = "Count") %>%
+      mutate(Type = "Simulated")
   }
-  
+
   hc <- highchart() %>%
-    hc_title(text = paste0(comp_title, " Population"), 
-             style = list(fontSize = "18px", fontFamily = "Tw Cen MT", fontWeight = "bold")) %>%
+    hc_title(text = paste0(comp_title, " Population"),
+             style = list(fontSize = "18px", fontFamily = APP_FONT, fontWeight = "bold")) %>%
     hc_xAxis(
-      title = list(text = "Time From Epidemic Onset (Days)", style = list(fontFamily = "Tw Cen MT")),
+      title = list(text = "Time From Epidemic Onset (Days)", style = list(fontFamily = APP_FONT)),
       labels = list(format = "{value:.0f}")
     ) %>%
-    hc_yAxis(title = list(text = "Number of Individuals", style = list(fontFamily = "Tw Cen MT"))) %>%
+    hc_yAxis(title = list(text = "Number of Individuals", style = list(fontFamily = APP_FONT))) %>%
     hc_tooltip(
       shared = TRUE,
       crosshairs = TRUE,
@@ -1634,173 +1675,51 @@ compartment_viz <- function(results, compartment, simulation_only = FALSE,
     ) %>%
     hc_chart(
       backgroundColor = "#FBFBFB",
-      style = list(fontFamily = "Tw Cen MT")
+      style = list(fontFamily = APP_FONT)
     )
-  
-  main_sim <- results[[comp_name]]
-  main_real <- if (!simulation_only) results[[paste0(comp_name, "_real")]] else NULL
-  
-  if ((input$ci_type == "Both" || input$ci_type == "Simulated Only") && !is.null(bootstrap_ci) && !simulation_only) {
-    ci_data <- bootstrap_ci[[comp_name]]
-    
-    if (!is.null(ci_data) && "Date" %in% names(ci_data)) {
-      ci_data_with_days <- ci_data %>%
-        mutate(Days = as.numeric(Date - min(results$Date, na.rm = TRUE))) %>%
-        filter(Days %in% results$Days) %>%
-        select(Days, starts_with("ci_"))
-      
-      if (nrow(ci_data_with_days) > 0 && any(!is.na(ci_data_with_days))) {
-        add_ci_band <- function(hc, low_col, high_col, level, opacity) {
-          band_data <- ci_data_with_days %>% 
-            select(Days, low = !!sym(low_col), high = !!sym(high_col)) %>%
-            filter(!is.na(low), !is.na(high), is.finite(low), is.finite(high))
-          
-          if (nrow(band_data) > 0) {
-            span_value <- 0.5  # More conservative smoothing
-            if (nrow(band_data) > 5) {
-              low_loess <- tryCatch({
-                loess(low ~ Days, data = band_data, span = span_value)
-              }, error = function(e) {
-                NULL
-              })
-              high_loess <- tryCatch({
-                loess(high ~ Days, data = band_data, span = span_value)
-              }, error = function(e) {
-                NULL
-              })
-              
-              if (!is.null(low_loess) && !is.null(high_loess)) {
-                band_data$low <- predict(low_loess)
-                band_data$high <- predict(high_loess)
-                
-                band_data$low <- pmax(0, band_data$low)
-                band_data$high <- pmax(0, band_data$high)
-                
-                band_data$low <- pmin(band_data$low, main_sim[match(band_data$Days, results$Days)])
-                band_data$high <- pmax(band_data$high, main_sim[match(band_data$Days, results$Days)])
-              } else {
-                band_data$low <- pmax(0, band_data$low)
-                band_data$high <- pmax(0, band_data$high)
-              }
-            }
-            
-            hc %>%
-              hc_add_series(
-                data = list_parse(band_data),
-                type = "areasplinerange",
-                name = paste0(comp_title, " Simulated CI ", level, "%"),
-                color = paste0("rgba(", paste(col2rgb(comp_colors[comp_name]), collapse = ","), ", ", opacity, ")"),
-                fillOpacity = opacity,
-                lineWidth = 0,
-                marker = list(enabled = FALSE),
-                zIndex = 1
-              )
-          } else {
-            hc
-          }
-        }
-        
-        if (show_ci$ci_95) {
-          hc <- add_ci_band(hc, "ci_2.5", "ci_97.5", "95", 0.15)
-        }
-        if (show_ci$ci_90) {
-          hc <- add_ci_band(hc, "ci_5", "ci_95", "90", 0.25)
-        }
-        if (show_ci$ci_75) {
-          hc <- add_ci_band(hc, "ci_12.5", "ci_87.5", "75", 0.35)
-        }
-        if (show_ci$ci_50) {
-          hc <- add_ci_band(hc, "ci_25", "ci_75", "50", 0.45)
-        }
-      }
+
+  # ---- simulated confidence bands -----------------------------------------
+  ci_data <- if (!is.null(sim_ci)) sim_ci[[comp_name]] else NULL
+
+  if (!is.null(ci_data) && "Date" %in% names(ci_data) && nrow(ci_data) > 0) {
+
+    ci_days <- ci_data %>%
+      mutate(Days = as.numeric(Date - min(results$Date, na.rm = TRUE))) %>%
+      filter(Days %in% results$Days) %>%
+      select(Days, starts_with("ci_"))
+
+    # widest band first so the narrower ones stay visible on top of it
+    add_ci_band <- function(hc, low_col, high_col, level, opacity) {
+      band_data <- ci_days %>%
+        select(Days, low = !!sym(low_col), high = !!sym(high_col)) %>%
+        filter(is.finite(low), is.finite(high))
+
+      if (nrow(band_data) == 0) return(hc)
+
+      # quantiles of a population size cannot be negative; no other adjustment
+      # is applied, so the band is exactly the empirical quantile envelope.
+      band_data$low  <- pmax(0, band_data$low)
+      band_data$high <- pmax(band_data$high, band_data$low)
+
+      hc %>%
+        hc_add_series(
+          data = list_parse(band_data),
+          type = "areasplinerange",
+          name = paste0(comp_title, " Simulated CI ", level, "%"),
+          color = paste0("rgba(", paste(col2rgb(comp_colors[comp_name]), collapse = ","), ", ", opacity, ")"),
+          fillOpacity = opacity,
+          lineWidth = 0,
+          marker = list(enabled = FALSE),
+          zIndex = 1
+        )
     }
+
+    if (isTRUE(show_ci$ci_95)) hc <- add_ci_band(hc, "ci_2.5",  "ci_97.5", "95", 0.15)
+    if (isTRUE(show_ci$ci_90)) hc <- add_ci_band(hc, "ci_5",    "ci_95",   "90", 0.25)
+    if (isTRUE(show_ci$ci_75)) hc <- add_ci_band(hc, "ci_12.5", "ci_87.5", "75", 0.35)
+    if (isTRUE(show_ci$ci_50)) hc <- add_ci_band(hc, "ci_25",   "ci_75",   "50", 0.45)
   }
-  
-  if ((input$ci_type == "Both" || input$ci_type == "Real Only") && !is.null(real_data_ci) && !simulation_only) {
-    tryCatch({
-      comp_ci <- real_data_ci[[comp_name]]
-      
-      if (!is.null(comp_ci) && "Date" %in% names(comp_ci) && nrow(comp_ci) > 0) {
-        if (all(!is.na(comp_ci$Date)) && inherits(comp_ci$Date, "Date")) {
-          real_ci_with_days <- comp_ci %>%
-            mutate(Days = as.numeric(Date - min(results$Date, na.rm = TRUE))) %>%
-            filter(Days %in% results$Days) %>%
-            filter(complete.cases(across(starts_with("ci_"))))
-          
-          if (nrow(real_ci_with_days) > 0) {
-            add_real_ci_band <- function(hc, low_col, high_col, level, opacity) {
-              band_data <- real_ci_with_days %>% 
-                select(Days, low = !!sym(low_col), high = !!sym(high_col)) %>%
-                filter(!is.na(low), !is.na(high), is.finite(low), is.finite(high))
-              
-              if (nrow(band_data) > 0) {
-                span_value <- 0.5  # More conservative smoothing
-                if (nrow(band_data) > 5) {
-                  low_loess <- tryCatch({
-                    loess(low ~ Days, data = band_data, span = span_value)
-                  }, error = function(e) {
-                    NULL
-                  })
-                  high_loess <- tryCatch({
-                    loess(high ~ Days, data = band_data, span = span_value)
-                  }, error = function(e) {
-                    NULL
-                  })
-                  
-                  if (!is.null(low_loess) && !is.null(high_loess)) {
-                    band_data$low <- predict(low_loess)
-                    band_data$high <- predict(high_loess)
-                    
-                    band_data$low <- pmax(0, band_data$low)
-                    band_data$high <- pmax(0, band_data$high)
-                    
-                    band_data$low <- pmin(band_data$low, main_real[match(band_data$Days, results$Days)])
-                    band_data$high <- pmax(band_data$high, main_real[match(band_data$Days, results$Days)])
-                  } else {
-                    band_data$low <- pmax(0, band_data$low)
-                    band_data$high <- pmax(0, band_data$high)
-                  }
-                }
-                
-                grey_value <- 100 - (as.numeric(gsub("%", "", level)) / 100 * 60)
-                grey_value <- max(40, min(100, grey_value))
-                
-                hc %>%
-                  hc_add_series(
-                    data = list_parse(band_data),
-                    type = "areasplinerange",
-                    name = paste0(comp_title, " Real CI ", level, "%"),
-                    color = paste0("rgba(", grey_value, ", ", grey_value, ", ", grey_value, ", ", opacity, ")"),
-                    fillOpacity = opacity,
-                    lineWidth = 0,
-                    marker = list(enabled = FALSE),
-                    zIndex = 0
-                  )
-              } else {
-                hc
-              }
-            }
-            
-            if (show_ci$ci_95) {
-              hc <- add_real_ci_band(hc, "ci_2.5", "ci_97.5", "95", 0.10)
-            }
-            if (show_ci$ci_90) {
-              hc <- add_real_ci_band(hc, "ci_5", "ci_95", "90", 0.15)
-            }
-            if (show_ci$ci_75) {
-              hc <- add_real_ci_band(hc, "ci_12.5", "ci_87.5", "75", 0.20)
-            }
-            if (show_ci$ci_50) {
-              hc <- add_real_ci_band(hc, "ci_25", "ci_75", "50", 0.25)
-            }
-          }
-        }
-      }
-    }, error = function(e) {
-      message("Error adding real data CI for ", comp_name, ": ", e$message)
-    })
-  }
-  
+
   hc <- hc %>%
     hc_add_series(
       data = long_data %>% filter(Type == "Simulated"),
@@ -1813,8 +1732,8 @@ compartment_viz <- function(results, compartment, simulation_only = FALSE,
       marker = list(enabled = FALSE),
       zIndex = 5
     )
-  
-  if (!simulation_only) {
+
+  if (has_real) {
     hc <- hc %>%
       hc_add_series(
         data = long_data %>% filter(Type == "Real"),
@@ -1828,7 +1747,7 @@ compartment_viz <- function(results, compartment, simulation_only = FALSE,
         zIndex = 6
       )
   }
-  
+
   return(hc)
 }
 
@@ -1846,13 +1765,16 @@ custom_datatable <- function(params) {
     options = list(
       dom = 'Brt',
       buttons = c('csv','excel', 'pdf'),
-      pageLength = nrow(params)
+      pageLength = nrow(params),
+      scrollY = "230px",
+      scrollCollapse = TRUE,
+      paging = FALSE
     )
   ) %>%
     formatStyle(
       columns = 1:ncol(params),
       fontSize = '14px',
-      fontFamily = 'Tw Cen MT'
+      fontFamily = APP_FONT
     ) %>%
     formatStyle(
       columns = 1:ncol(params),
@@ -1862,448 +1784,147 @@ custom_datatable <- function(params) {
     formatStyle(
       columns = 1:ncol(params),
       backgroundColor = 'white'
-    ) 
+    ) %>%
+    formatStyle(
+      'Parameter',
+      fontWeight = 'bold'
+    )
 }
 
-si_params_table <- function(N, beta, days, results) {
-  
-  peak_day_sim <- results$time[which.max(results$I)]  # Get the day number where peak occurs
-  peak_value_sim <- max(results$I, na.rm = TRUE)
-  duration_sim <- as.numeric(max(results$Date) - min(results$Date))
-  final_s_sim <- tail(results$S, 1)
-  final_i_sim <- tail(results$I, 1)
-  
-  params <- data.frame(
-    Parameter = c("N", "Beta", "Initial S", "Initial I",
-                 "Final S", "Final I",
-                 "Duration (days)", "Peak Infections", 
-                 "Peak Time"), 
-    Description = c(
-      "Total population size",
-      "Transmission rate (range: 0.1-3.0 per day)",
-      "Initial susceptible population",
-      "Initial infected population",
-      "Final susceptible population",
-      "Final infected population",
-      "Duration of epidemic",
-      "Peak number of infected",
-      "Day of peak infection"
-    ),
-    Value = c(
-      as.character(N),
-      as.character(round(beta, 3)),
-      as.character(input$initial_S_si),
-      as.character(input$initial_I_si),
-      as.character(round(final_s_sim),0),
-      as.character(round(final_i_sim),0),
-      as.character(duration_sim),
-      as.character(round(peak_value_sim),0),
-      paste0("Day ", as.character(peak_day_sim))
-    )
-  )
-  
-  custom_datatable(params)
-}
+# ---------------------------------------------------------------------------
+# model parameters table
+# ---------------------------------------------------------------------------
+# One builder for both modules, so a row called "Cumulative infections" means
+# the same thing everywhere and is computed by the same helper that fills the
+# Comparison tab.
+params_table_data <- function(model_type, N, beta, sigma = NULL, gamma = NULL,
+                              results, init, simulation_only = TRUE, dataset = NULL,
+                              event = "default") {
 
-sir_params_table <- function(N, beta, gamma, days, results) {
-  peak_day_sim <- results$time[which.max(results$I)]
-  peak_value_sim <- max(results$I, na.rm = TRUE)
-  duration_sim <- as.numeric(max(results$Date) - min(results$Date))
-  final_s_sim <- tail(results$S, 1)
-  final_i_sim <- tail(results$I, 1)
-  final_r_sim <- tail(results$R, 1)
-  
-  params <- data.frame(
-    Parameter = c("N", "Beta", "Gamma", "R0", 
-                 "Initial S", "Initial I", "Initial R",
-                 "Final S", "Final I", "Final R",
-                 "Duration (days)", "Peak Infections", 
-                 "Peak Time", "Infectious Period"),
-    Description = c(
-      "Total population size",
-      "Transmission rate (range: 0.1-3.0 per day)",
-      "Recovery rate (range: 0.05-0.5 per day)",
-      "Basic reproduction number (Beta/Gamma)",
-      "Initial susceptible population",
-      "Initial infected population",
-      "Initial recovered population",
-      "Final susceptible population",
-      "Final infected population",
-      "Final recovered population",
-      "Duration of epidemic",
-      "Peak number of infected",
-      "Day of peak infection",
-      "Average infectious period (1/Gamma)"
-    ),
-    Value = c(
-      as.character(N),
-      as.character(round(beta, 3)),
-      as.character(round(gamma, 3)),
-      as.character(round(beta/gamma, 3)),
-      as.character(input$initial_S_sir),
-      as.character(input$initial_I_sir),
-      as.character(input$initial_R_sir),
-      as.character(round(final_s_sim)),
-      as.character(round(final_i_sim)),
-      as.character(round(final_r_sim)),
-      as.character(duration_sim),
-      as.character(round(peak_value_sim)),
-      paste0("Day ", as.character(peak_day_sim)),
-      as.character(round(1/gamma, 1))
-    )
-  )
-  
-  custom_datatable(params)
-}
+  row <- function(p, d, v) data.frame(Parameter = p, Description = d, Value = as.character(v),
+                                      stringsAsFactors = FALSE)
+  n0 <- function(x) if (is.null(x) || length(x) == 0 || !is.finite(x)) 0 else x
+  fmt <- function(x, digits = 0) formatC(round(as.numeric(x), digits), format = "f",
+                                         digits = digits, big.mark = "")
 
-seir_params_table <- function(N, beta, sigma, gamma, days, results) {
-  peak_day_sim <- results$time[which.max(results$I)]  # Get the day number where peak occurs
-  peak_value_sim <- max(results$I, na.rm = TRUE)
-  duration_sim <- as.numeric(max(results$Date) - min(results$Date))
-  final_s_sim <- tail(results$S, 1)
-  final_e_sim <- tail(results$E, 1)
-  final_i_sim <- tail(results$I, 1)
-  final_r_sim <- tail(results$R, 1)
-  
-  params <- data.frame(
-    Parameter = c("N", "Beta", "Sigma", "Gamma", "R0",
-                 "Initial S", "Initial E", "Initial I", "Initial R",
-                 "Final S", "Final E", "Final I", "Final R",
-                 "Duration (days)", "Peak Infections", 
-                 "Peak Time", "Incubation Period", "Infectious Period"),
-    Description = c(
-      "Total population size",
-      "Transmission rate (range: 0.1-3.0 per day)",
-      "Exposure rate (range: 0.1-1.0 per day)",
-      "Recovery rate (range: 0.05-0.5 per day)",
-      "Basic reproduction number (Beta/Gamma)",
-      "Initial susceptible population",
-      "Initial exposed population",
-      "Initial infected population",
-      "Initial recovered population",
-      "Final susceptible population",
-      "Final exposed population",
-      "Final infected population",
-      "Final recovered population",
-      "Duration of epidemic",
-      "Peak number of infected",
-      "Day of peak infection",
-      "Average incubation period (1/Sigma)",
-      "Average infectious period (1/Gamma)"
-    ),
-    Value = c(
-      as.character(N),
-      as.character(round(beta, 3)),
-      as.character(round(sigma, 3)),
-      as.character(round(gamma, 3)),
-      as.character(round(beta/gamma, 3)),
-      as.character(input$initial_S_seir),
-      as.character(input$initial_E_seir),
-      as.character(input$initial_I_seir),
-      as.character(input$initial_R_seir),
-      as.character(round(final_s_sim)),
-      as.character(round(final_e_sim)),
-      as.character(round(final_i_sim)),
-      as.character(round(final_r_sim)),
-      as.character(duration_sim),
-      as.character(round(peak_value_sim)),
-      paste0("Day ", as.character(peak_day_sim)),
-      as.character(round(1/sigma, 1)),
-      as.character(round(1/gamma, 1))
-    )
-  )
-  
-  custom_datatable(params)
-}
+  sim_m <- simulated_metrics(results, N)
 
-real_si_params_table <- function(dataset, beta, results, N_override = NULL) {
-  N <- if (!is.null(N_override)) N_override else nrow(dataset)
-  peak_day_sim <- results$time[which.max(results$I)] 
-  peak_value_sim <- max(results$I, na.rm = TRUE)
-  duration_sim <- as.numeric(max(results$Date) - min(results$Date))
-  final_s_sim <- tail(results$S, 1)
-  final_i_sim <- tail(results$I, 1)
-  
-  peak_day_real <- results$time[which.max(results$I_real)]
-  peak_value_real <- max(results$I_real, na.rm = TRUE)
-  duration_real <- as.numeric(max(results$Date[!is.na(results$I_real)]) - 
-                   min(results$Date[!is.na(results$I_real)]))
-  final_s_real <- tail(results$S_real[!is.na(results$S_real)], 1)
-  final_i_real <- tail(results$I_real[!is.na(results$I_real)], 1)
-  
-  # Calculate infections saved if N was overridden
-  infections_saved <- if (!is.null(N_override)) N_override - nrow(dataset) else NA
-  
-  params <- data.frame(
-    Parameter = c("N", "Beta", "Initial S (Simulated)", "Initial I (Simulated)",
-                 "Final S (Simulated)", "Final I (Simulated)",
-                 "Initial S (Real)", "Initial I (Real)",
-                 "Final S (Real)", "Final I (Real)",
-                 "Simulated Duration (days)", "Simulated Peak", 
-                 "Simulated Peak Day", "Real Duration (days)", 
-                 "Real Peak", "Real Peak Day"),
-    Description = c(
-      "Total population size",
-      "Transmission rate (range: 0.1-3.0 per day)",
-      "Initial susceptible population (simulated)",
-      "Initial infected population (simulated)",
-      "Final susceptible population (simulated)",
-      "Final infected population (simulated)",
-      "Initial susceptible population (real)",
-      "Initial infected population (real)",
-      "Final susceptible population (real)",
-      "Final infected population (real)",
-      "Duration of epidemic (simulated)",
-      "Peak number of infected (simulated)",
-      "Day of peak infection (simulated)",
-      "Duration of epidemic (real)",
-      "Peak number of infected (real)",
-      "Day of peak infection (real)"
-    ),
-    Value = c(
-      as.character(N),
-      as.character(round(beta, 3)),
-      as.character(N - 1),
-      "1",
-      as.character(round(final_s_sim)),
-      as.character(round(final_i_sim)),
-      as.character(N),
-      "0",
-      as.character(round(final_s_real)),
-      as.character(round(final_i_real)),
-      as.character(duration_sim),
-      as.character(round(peak_value_sim)),
-      paste0("Day ", as.character(peak_day_sim)),
-      as.character(duration_real),
-      as.character(round(peak_value_real)),
-      paste0("Day ", as.character(peak_day_real))
-    )
-  )
-  
-  # add infections saved row if applicable
-  if (!is.na(infections_saved)) {
-    infections_row <- data.frame(
-      Parameter = "Total Infections Saved",
-      Description = "Estimated infections prevented compared to baseline",
-      Value = as.character(round(infections_saved))
-    )
-    params <- rbind(params, infections_row)
+  # When N still equals the number of case records, say so in the output. The
+  # review objected to that being ASSUMED; stating it on every run means the
+  # reader can see the assumption instead of inheriting it silently.
+  n_note <- if (!simulation_only && !is.null(dataset) && isTRUE(N == nrow(dataset))) {
+    paste0("Total population at risk - WARNING: still equal to the ", nrow(dataset),
+           " case records, which is a placeholder, not a population at risk")
+  } else if (!simulation_only) {
+    "Total population at risk (set by the user)"
+  } else {
+    "Total population size"
   }
-  
-  custom_datatable(params)
+
+  out <- list(
+    row("N", n_note, fmt(N)),
+    row("Beta", "Transmission rate (per day)", fmt(beta, 3))
+  )
+
+  if (model_type == "SEIR") {
+    out <- c(out, list(row("Sigma", "Exposure (onset) rate, per day", fmt(sigma, 3))))
+  }
+  if (model_type %in% c("SIR", "SEIR")) {
+    out <- c(out, list(
+      row("Gamma", "Recovery rate (per day)", fmt(gamma, 3)),
+      row("R0", "Basic reproduction number (Beta / Gamma)", fmt(beta / gamma, 3))
+    ))
+  }
+
+  # initial conditions actually handed to the solver
+  src <- if (simulation_only) "(set in the sidebar)" else "(from the sidebar; defaults estimated from the uploaded data)"
+  out <- c(out, list(row("Initial S", paste("Initial susceptible", src), fmt(n0(init$S)))))
+  if (model_type == "SEIR") {
+    out <- c(out, list(row("Initial E", paste("Initial exposed", src), fmt(n0(init$E)))))
+  }
+  out <- c(out, list(row("Initial I", paste("Initial infected", src), fmt(n0(init$I)))))
+  if (model_type %in% c("SIR", "SEIR")) {
+    out <- c(out, list(row("Initial R", paste("Initial recovered", src), fmt(n0(init$R)))))
+  }
+
+  # final state of the simulated run
+  out <- c(out, list(row("Final S (simulated)", "Susceptible on the last simulated day", fmt(tail(results$S, 1)))))
+  if (model_type == "SEIR") {
+    out <- c(out, list(row("Final E (simulated)", "Exposed on the last simulated day", fmt(tail(results$E, 1)))))
+  }
+  out <- c(out, list(row("Final I (simulated)", "Infectious on the last simulated day", fmt(tail(results$I, 1)))))
+  if (model_type %in% c("SIR", "SEIR")) {
+    out <- c(out, list(row("Final R (simulated)", "Recovered on the last simulated day", fmt(tail(results$R, 1)))))
+  }
+
+  out <- c(out, list(
+    row("Cumulative infections (simulated)", "Everyone infected over the run (N - final susceptible)", fmt(sim_m[["cumulative_infections"]])),
+    row("Peak infectious (simulated)", "Largest number infectious on any single day", fmt(sim_m[["peak_prevalence"]])),
+    row("Day of peak (simulated)", "Days from the start of the run to that peak", paste0("Day ", fmt(sim_m[["peak_prevalence_day"]]))),
+    row("Outbreak duration (simulated)", "First to last day with at least one new infection", fmt(sim_m[["duration"]])),
+    row("Attack rate (simulated)", "Cumulative infections as a percentage of N", paste0(fmt(sim_m[["attack_rate"]], 1), " %")),
+    row("Simulated run length", "Days integrated (day 0 to the last day)", fmt(max(results$time)))
+  ))
+
+  if (model_type %in% c("SIR", "SEIR")) {
+    out <- c(out, list(row("Infectious period", "Average time infectious (1 / Gamma, days)", fmt(1 / gamma, 1))))
+  }
+  if (model_type == "SEIR") {
+    out <- c(out, list(row("Incubation period", "Average time exposed (1 / Sigma, days)", fmt(1 / sigma, 1))))
+  }
+
+  # ---- observed side ------------------------------------------------------
+  if (!simulation_only && !is.null(dataset)) {
+    obs_m <- observed_metrics(results, N)
+    ev <- observed_events(dataset, gamma)
+
+    out <- c(out, list(
+      row("Cases in file", "Rows with a usable onset date", fmt(ev$n_cases)),
+      row("Cumulative infections (observed)", "Total cases recorded over the observed window", fmt(obs_m[["cumulative_infections"]])),
+      row("Peak infectious (observed)", "Largest reconstructed infectious prevalence", fmt(obs_m[["peak_prevalence"]])),
+      row("Day of peak (observed)", "Days from the start of the shared window to that peak", paste0("Day ", fmt(obs_m[["peak_prevalence_day"]]))),
+      row("Peak daily cases (observed)", "Largest number of new cases in a single day", fmt(obs_m[["peak_incidence"]])),
+      row("Outbreak duration (observed)", "First to last day with at least one new case", fmt(obs_m[["duration"]])),
+      row("Attack rate (observed)", "Observed cases as a percentage of N", paste0(fmt(obs_m[["attack_rate"]], 1), " %"))
+    ))
+
+    if (model_type == "SEIR") {
+      incub <- as.numeric(ev$onset - ev$exposure)
+      incub <- incub[is.finite(incub)]
+      out <- c(out, list(row(
+        "Observed incubation period",
+        "Exposure to onset in the uploaded line list (days)",
+        if (length(incub) > 0)
+          paste0("Mean ", round(mean(incub), 1), " (range ", min(incub), "-", max(incub), ")")
+        else "Not available")))
+    }
+
+    out <- c(out, list(row(
+      "Assumed recovery delay",
+      "Infection to recovery used to reconstruct the observed R compartment (ceiling(1 / Gamma))",
+      paste0(ev$recovery_days, " days"))))
+
+    if (model_type != "SEIR") {
+      w <- resolve_event(model_type, event)
+      out <- c(out, list(row(
+        "Observed infection event",
+        "Column read as the S to I transition when reconstructing the observed curve",
+        paste0(if (w == "onset") "date_of_onset" else "date_of_exposure",
+               if (is.null(event) || event == "default") "  (model default)" else "  (set in the sidebar)"))))
+    }
+  }
+
+  do.call(rbind, out)
 }
 
-real_sir_params_table <- function(dataset, beta, gamma, results, N_override = NULL) {
-  N <- if (!is.null(N_override)) N_override else nrow(dataset)
-  peak_day_sim <- results$time[which.max(results$I)]
-  peak_value_sim <- max(results$I, na.rm = TRUE)
-  duration_sim <- as.numeric(max(results$Date) - min(results$Date))
-  final_s_sim <- tail(results$S, 1)
-  final_i_sim <- tail(results$I, 1)
-  final_r_sim <- tail(results$R, 1)
-  
-  peak_day_real <- results$time[which.max(results$I_real)]
-  peak_value_real <- max(results$I_real, na.rm = TRUE)
-  duration_real <- as.numeric(max(results$Date[!is.na(results$I_real)]) - 
-                             min(results$Date[!is.na(results$I_real)]))
-  final_s_real <- tail(results$S_real[!is.na(results$S_real)], 1)
-  final_i_real <- tail(results$I_real[!is.na(results$I_real)], 1)
-  final_r_real <- tail(results$R_real[!is.na(results$R_real)], 1)
-  
-  # Calculate infections saved if N was overridden
-  infections_saved <- if (!is.null(N_override)) N_override - nrow(dataset) else NA
-  
-  params <- data.frame(
-    Parameter = c("N", "Beta", "Gamma", "R0", 
-                 "Initial S (Simulated)", "Initial I (Simulated)", "Initial R (Simulated)",
-                 "Final S (Simulated)", "Final I (Simulated)", "Final R (Simulated)",
-                 "Initial S (Real)", "Initial I (Real)", "Initial R (Real)",
-                 "Final S (Real)", "Final I (Real)", "Final R (Real)",
-                 "Simulated Duration (days)", "Simulated Peak", 
-                 "Simulated Peak Day",
-                 "Real Duration (days)", 
-                 "Real Peak", "Real Peak Day",
-                 "Infectious Period"),
-    Description = c(
-      "Total population size",
-      "Transmission rate (range: 0.1-3.0 per day)",
-      "Recovery rate (range: 0.05-0.5 per day)",
-      "Basic reproduction number (Beta/Gamma)",
-      "Initial susceptible population (simulated)",
-      "Initial infected population (simulated)",
-      "Initial recovered population (simulated)",
-      "Final susceptible population (simulated)",
-      "Final infected population (simulated)",
-      "Final recovered population (simulated)",
-      "Initial susceptible population (real)",
-      "Initial infected population (real)",
-      "Initial recovered population (real)",
-      "Final susceptible population (real)",
-      "Final infected population (real)",
-      "Final recovered population (real)",
-      "Duration of epidemic (simulated)",
-      "Peak number of infected (simulated)",
-      "Day of peak infection (simulated)",
-      "Duration of epidemic (real)",
-      "Peak number of infected (real)",
-      "Day of peak infection (real)",
-      "Average infectious period (1/Gamma)"
-    ),
-    Value = c(
-      as.character(N),
-      as.character(round(beta, 3)),
-      as.character(round(gamma, 3)),
-      as.character(round(beta/gamma, 3)),
-      as.character(N - 1),
-      "1",
-      "0",
-      as.character(round(final_s_sim)),
-      as.character(round(final_i_sim)),
-      as.character(round(final_r_sim)),
-      as.character(N),
-      "0",
-      "0",
-      as.character(round(final_s_real)),
-      as.character(round(final_i_real)),
-      as.character(round(final_r_real)),
-      as.character(duration_sim),
-      as.character(round(peak_value_sim)),
-      paste0("Day ", as.character(peak_day_sim)),
-      as.character(duration_real),
-      as.character(round(peak_value_real)),
-      paste0("Day ", as.character(peak_day_real)),
-      as.character(round(1/gamma, 1))
-    )
-  )
-  
-  # add infections saved row if applicable
-  if (!is.na(infections_saved)) {
-    infections_row <- data.frame(
-      Parameter = "Total Infections Saved",
-      Description = "Estimated infections prevented compared to baseline",
-      Value = as.character(round(infections_saved))
-    )
-    params <- rbind(params, infections_row)
-  }
-  
-  custom_datatable(params)
-}
+# wrappers kept for readability at the call sites
+si_params_table   <- function(N, beta, days, results, init)                      custom_datatable(params_table_data("SI",   N, beta, NULL,  NULL,  results, init, TRUE))
+sir_params_table  <- function(N, beta, gamma, days, results, init)               custom_datatable(params_table_data("SIR",  N, beta, NULL,  gamma, results, init, TRUE))
+seir_params_table <- function(N, beta, sigma, gamma, days, results, init)        custom_datatable(params_table_data("SEIR", N, beta, sigma, gamma, results, init, TRUE))
 
-real_seir_params_table <- function(dataset, beta, sigma, gamma, results, N_override = NULL) {
-  N <- if (!is.null(N_override)) N_override else nrow(dataset)
-  peak_day_sim <- results$time[which.max(results$I)]
-  peak_value_sim <- max(results$I, na.rm = TRUE)
-  duration_sim <- as.numeric(max(results$Date) - min(results$Date))
-  final_s_sim <- tail(results$S, 1)
-  final_e_sim <- tail(results$E, 1)
-  final_i_sim <- tail(results$I, 1)
-  final_r_sim <- tail(results$R, 1)
-  
-  peak_day_real <- results$time[which.max(results$I_real)]
-  peak_value_real <- max(results$I_real, na.rm = TRUE)
-  duration_real <- as.numeric(max(results$Date[!is.na(results$I_real)]) - 
-                             min(results$Date[!is.na(results$I_real)]))
-  final_s_real <- tail(results$S_real[!is.na(results$S_real)], 1)
-  final_e_real <- tail(results$E_real[!is.na(results$E_real)], 1)
-  final_i_real <- tail(results$I_real[!is.na(results$I_real)], 1)
-  final_r_real <- tail(results$R_real[!is.na(results$R_real)], 1)
-  
-  incubation_days <- as.numeric(dataset$date_of_onset - dataset$date_of_exposure)
-  incubation_days <- incubation_days[!is.na(incubation_days)]
-  
-  # Calculate infections saved if N was overridden
-  infections_saved <- if (!is.null(N_override)) N_override - nrow(dataset) else NA
-  
-  params <- data.frame(
-    Parameter = c("N", "Beta", "Sigma", "Gamma", "R0", 
-                 "Initial S (Simulated)", "Initial E (Simulated)", "Initial I (Simulated)", "Initial R (Simulated)",
-                 "Final S (Simulated)", "Final E (Simulated)", "Final I (Simulated)", "Final R (Simulated)",
-                 "Initial S (Real)", "Initial E (Real)", "Initial I (Real)", "Initial R (Real)",
-                 "Final S (Real)", "Final E (Real)", "Final I (Real)", "Final R (Real)",
-                 "Incubation Period", "Infectious Period", "Simulated Duration (days)", 
-                 "Simulated Peak", "Simulated Peak Day",
-                 "Real Duration (days)", 
-                 "Real Peak", "Real Peak Day"),
-    Description = c(
-      "Total population size",
-      "Transmission rate (range: 0.1-3.0 per day)",
-      "Exposure rate (range: 0.1-1.0 per day)",
-      "Recovery rate (range: 0.05-0.5 per day)",
-      "Basic reproduction number (Beta/Gamma)",
-      "Initial susceptible population (simulated)",
-      "Initial exposed population (simulated)",
-      "Initial infected population (simulated)",
-      "Initial recovered population (simulated)",
-      "Final susceptible population (simulated)",
-      "Final exposed population (simulated)",
-      "Final infected population (simulated)",
-      "Final recovered population (simulated)",
-      "Initial susceptible population (real)",
-      "Initial exposed population (real)",
-      "Initial infected population (real)",
-      "Initial recovered population (real)",
-      "Final susceptible population (real)",
-      "Final exposed population (real)",
-      "Final infected population (real)",
-      "Final recovered population (real)",
-      "Time from exposure to onset (days)",
-      "Time from onset to recovery (days)",
-      "Duration of epidemic (simulated)",
-      "Peak number of infected (simulated)",
-      "Day of peak infection (simulated)", 
-      "Duration of epidemic (real)",
-      "Peak number of infected (real)",
-      "Day of peak infection (real)" 
-    ),
-    Value = c(
-      as.character(N),
-      as.character(round(beta, 3)),
-      as.character(round(sigma, 3)),
-      as.character(round(gamma, 3)),
-      as.character(round(beta/gamma, 3)),
-      as.character(N - 1),
-      "0",
-      "1",
-      "0",
-      as.character(round(final_s_sim)),
-      as.character(round(final_e_sim)),
-      as.character(round(final_i_sim)),
-      as.character(round(final_r_sim)),
-      as.character(N),
-      "0",
-      "0",
-      "0",
-      as.character(round(final_s_real)),
-      as.character(round(final_e_real)),
-      as.character(round(final_i_real)),
-      as.character(round(final_r_real)),
-      ifelse(length(incubation_days) > 0,
-             paste0("Mean: ", round(mean(incubation_days)), 
-                   " days (range ", min(incubation_days), "-", 
-                   max(incubation_days), ")"),
-             "Not available"),
-      as.character(round(1/gamma, 1)),
-      as.character(duration_sim),
-      as.character(round(peak_value_sim)),
-      paste0("Day ", as.character(peak_day_sim)),
-      as.character(duration_real),
-      as.character(round(peak_value_real)),
-      paste0("Day ", as.character(peak_day_real))
-    )
-  )
-  
-  # add infections saved row if applicable
-  if (!is.na(infections_saved)) {
-    infections_row <- data.frame(
-      Parameter = "Total Infections Saved",
-      Description = "Estimated infections prevented compared to baseline",
-      Value = as.character(round(infections_saved))
-    )
-    params <- rbind(params, infections_row)
-  }
-  
-  custom_datatable(params)
-}
+real_si_params_table   <- function(dataset, beta, results, N, init)              custom_datatable(params_table_data("SI",   N, beta, NULL,  NULL,  results, init, FALSE, dataset))
+real_sir_params_table  <- function(dataset, beta, gamma, results, N, init)       custom_datatable(params_table_data("SIR",  N, beta, NULL,  gamma, results, init, FALSE, dataset))
+real_seir_params_table <- function(dataset, beta, sigma, gamma, results, N, init) custom_datatable(params_table_data("SEIR", N, beta, sigma, gamma, results, init, FALSE, dataset))
 
 ```
 
@@ -2346,7 +1967,7 @@ render_demographic_table <- function(summary_df) {
       formatStyle(
         columns = 1:ncol(summary_df),
         fontSize = '14px',
-        fontFamily = 'Tw Cen MT'
+        fontFamily = APP_FONT
       ) %>%
       formatRound(columns = c("Mean", "SD"), digits = 2)
   } else {
@@ -2361,7 +1982,7 @@ render_demographic_table <- function(summary_df) {
       formatStyle(
         columns = 1:ncol(summary_df),
         fontSize = '14px',
-        fontFamily = 'Tw Cen MT'
+        fontFamily = APP_FONT
       ) %>%
       formatPercentage('Percentage', 1)
   }
@@ -2398,44 +2019,92 @@ selectInput(inputId = "model", label = "Select Model",
             choices = c("SI", "SIR", "SEIR"),
             selected = "SI")
 
-# only show these inputs in simulation-only mode
+# ---------------------------------------------------------------------------
+# population at risk
+# ---------------------------------------------------------------------------
+# In real-vs-simulated mode N used to be hidden behind a checkbox and silently
+# defaulted to the number of rows in the uploaded file, which forces the
+# simulated epidemic to run in a population the size of the case series. N is
+# now always visible and always the user's choice; the row count is only the
+# starting suggestion and the lower bound.
 conditionalPanel(
   condition = "input.simulation_only == true",
-  numericInput("N", "Total Population (N):", 100, min = 1, max = 100, step = 1),
+  numericInput("N", "Total Population (N):", 100, min = 1, step = 1)
+)
 
-  conditionalPanel(
-    condition = "input.model == 'SI'",
-    numericInput("initial_S_si", "Initial Susceptible:", 99, min = 0, step = 1),
-    numericInput("initial_I_si", "Initial Infected:", 1, min = 0, step = 1)
-  ),
+# Uploading a file pre-fills N with the case count so the box is never empty
+# and the model can be run straight away. The review asked that the population
+# at risk not be AUTOMATICALLY ASSUMED to equal the number of case records, so
+# the pre-filled value is treated as a starting point that is declared rather
+# than relied on: the hint below turns into a warning while N still equals the
+# case count, and the Model Parameters table records, with every run, whether N
+# was the case-count placeholder or a figure the user supplied.
+conditionalPanel(
+  condition = "input.simulation_only == false",
+  numericInput("N_real", "Total Population at Risk (N):", value = NA, min = 1, step = 1),
+  div(style = "font-size: 12px; margin-top: -8px; margin-bottom: 12px;",
+      uiOutput("N_real_hint"))
+)
 
-  conditionalPanel(
-    condition = "input.model == 'SIR'",
-    numericInput("initial_S_sir", "Initial Susceptible:", 99, min = 0, step = 1),
-    numericInput("initial_I_sir", "Initial Infected:", 1, min = 0, step = 1),
-    numericInput("initial_R_sir", "Initial Recovered:", 0, min = 0, step = 1)
-  ),
+# ---------------------------------------------------------------------------
+# initial compartment sizes - available in BOTH modules
+# ---------------------------------------------------------------------------
+# In real-vs-simulated mode these are pre-filled from the uploaded data (who is
+# already exposed, symptomatic or recovered on the first day of the window)
+# instead of always starting from a single infected individual.
+conditionalPanel(
+  condition = "input.model == 'SI'",
+  numericInput("initial_S_si", "Initial Susceptible:", 99, min = 0, step = 1),
+  numericInput("initial_I_si", "Initial Infected:", 1, min = 0, step = 1)
+)
 
-  conditionalPanel(
-    condition = "input.model == 'SEIR'",
-    numericInput("initial_S_seir", "Initial Susceptible:", 99, min = 0, step = 1),
-    numericInput("initial_E_seir", "Initial Exposed:", 0, min = 0, step = 1),
-    numericInput("initial_I_seir", "Initial Infected:", 1, min = 0, step = 1),
-    numericInput("initial_R_seir", "Initial Recovered:", 0, min = 0, step = 1)
-  ),
+conditionalPanel(
+  condition = "input.model == 'SIR'",
+  numericInput("initial_S_sir", "Initial Susceptible:", 99, min = 0, step = 1),
+  numericInput("initial_I_sir", "Initial Infected:", 1, min = 0, step = 1),
+  numericInput("initial_R_sir", "Initial Recovered:", 0, min = 0, step = 1)
+)
 
+conditionalPanel(
+  condition = "input.model == 'SEIR'",
+  numericInput("initial_S_seir", "Initial Susceptible:", 99, min = 0, step = 1),
+  numericInput("initial_E_seir", "Initial Exposed:", 0, min = 0, step = 1),
+  numericInput("initial_I_seir", "Initial Infected:", 1, min = 0, step = 1),
+  numericInput("initial_R_seir", "Initial Recovered:", 0, min = 0, step = 1)
+)
+
+actionLink("reset_initials", "Reset initial values",
+           style = "color:#d7a9d3; font-size: 12px; display:block; margin-bottom: 12px;")
+
+conditionalPanel(
+  condition = "input.simulation_only == true",
   numericInput("days", "Simulation Duration (days):", 30, min = 1, step = 1)
 )
 
-# new slider for Total population input for real data mode
+# in real mode the run length comes from the data; this extends it so a
+# simulated epidemic is not cut off before it peaks
 conditionalPanel(
   condition = "input.simulation_only == false",
-  checkboxInput("custom_N", "Optional: Input Total Population", FALSE),
-  conditionalPanel(
-    condition = "input.custom_N == true",
-    sliderInput("N_real", "Total Population (N)",
-                min = 10, max = 1000, value = 100, step = 1)
-  )
+  numericInput("extra_days", "Extend Simulation Beyond Data (days):", 0, min = 0, max = 730, step = 1)
+)
+
+# ---------------------------------------------------------------------------
+# which column counts as the S -> I transition
+# ---------------------------------------------------------------------------
+# SI and SIR both have no latent class, yet the app as received reads that
+# transition from date_of_exposure in SI and from date_of_onset in SIR. That
+# is a judgement call, not a defect, so it is exposed here with the original
+# behaviour preselected. Leaving this alone reproduces the app exactly as it
+# was. SEIR uses both columns by construction and ignores the setting.
+conditionalPanel(
+  condition = "input.simulation_only == false && input.model != 'SEIR'",
+  selectInput("obs_event", "Observed Infection Event:",
+              choices = c("Model default (SI: exposure, SIR: onset)" = "default",
+                          "Date of exposure" = "exposure",
+                          "Date of onset" = "onset"),
+              selected = "default"),
+  div(style = "font-size: 12px; color: #c9c9c9; margin-top: -8px; margin-bottom: 12px;",
+      textOutput("obs_event_hint"))
 )
 
 sliderInput("beta", "Transmission Rate (Beta, range: 0.1-3.0):", value = 0.3, min = 0.1, max = 3.0, step = 0.01, ticks = FALSE)
@@ -2469,36 +2138,42 @@ hr()
 
 checkboxInput("separate_plots", "Show compartments separately", FALSE)
 
-# new check boxes for the defined CI levels
+# ---------------------------------------------------------------------------
+# confidence intervals
+# ---------------------------------------------------------------------------
+# Available in BOTH modules and always describing the simulated scenario only,
+# so the Real / Both / Simulated selector is no longer needed.
 conditionalPanel(
-  condition = "input.separate_plots == true && input.simulation_only == false",
-  selectInput("ci_type", "Show Confidence Intervals For:", 
-              choices = c("Both", "Real Only", "Simulated Only"), 
-              selected = "Both"),
+  condition = "input.separate_plots == true",
+  div(style = "font-size: 12px; color: #c9c9c9; margin-bottom: 6px;",
+      "Confidence intervals describe the simulated scenario."),
   checkboxInput("ci_95", "Show 95% CI", FALSE),
   checkboxInput("ci_90", "Show 90% CI", FALSE),
   checkboxInput("ci_75", "Show 75% CI", FALSE),
-  checkboxInput("ci_50", "Show 50% CI", FALSE)
+  checkboxInput("ci_50", "Show 50% CI", FALSE),
+  sliderInput("param_cv", "Parameter uncertainty (CV):",
+              value = 0.10, min = 0.01, max = 0.50, step = 0.01, ticks = FALSE)
 )
 
 conditionalPanel(
   condition = "input.separate_plots == true",
   selectInput("compartment", "Select Compartment",
-              choices = c("Susceptible" = "susceptible",
-                         "Infected" = "infected"),
-              selected = "susceptible")
+              choices = c("Infected" = "infected",
+                         "Susceptible" = "susceptible"),
+              selected = "infected")
 )
 
 # update compartment dropdown based on model selection
+# Infected first and selected by default: it is the curve users look at.
 observeEvent(input$model, {
   choices <- if (input$model == "SI") {
-    c("Susceptible" = "susceptible", "Infected" = "infected")
+    c("Infected" = "infected", "Susceptible" = "susceptible")
   } else if (input$model == "SIR") {
-    c("Susceptible" = "susceptible", "Infected" = "infected", "Recovered" = "recovered")
+    c("Infected" = "infected", "Susceptible" = "susceptible", "Recovered" = "recovered")
   } else {
-    c("Susceptible" = "susceptible", "Exposed" = "exposed", "Infected" = "infected", "Recovered" = "recovered")
+    c("Infected" = "infected", "Exposed" = "exposed", "Susceptible" = "susceptible", "Recovered" = "recovered")
   }
-  updateSelectInput(session, "compartment", choices = choices, selected = "susceptible")
+  updateSelectInput(session, "compartment", choices = choices, selected = "infected")
 })
 
 hr()
@@ -2523,43 +2198,46 @@ conditionalPanel(
 
 hr()
 
-downloadButton("download_manual", "Download User Manual",
-               style = "color: #fff; background-color: #5c0b55; border-color: #5c0b55")
+# NOTE: shiny::downloadButton() ends in an assignment, so on some shiny
+# versions (1.8.0 among them) it returns INVISIBLY and knitr prints nothing -
+# the button silently disappears from the sidebar. Wrapping it in div() forces
+# a visible value and works on every version.
+div(downloadButton("download_manual", "Download User Manual",
+                   style = "color: #fff; background-color: #5c0b55; border-color: #5c0b55"))
 
 hr()
 
-renderValueBox({
-  data <- read.csv("mock_data-2025-06-13.csv")
+# download handlers are registered once at startup rather than from inside a
+# render function (which re-registered them on every invalidation)
+output$downloadData <- downloadHandler(
+  filename = function() paste0("mock_data-", Sys.Date(), ".csv"),
+  content = function(file) {
+    src <- app_file("mock_data-2025-06-13.csv")
+    if (file.exists(src)) file.copy(src, file, overwrite = TRUE)
+  }
+)
 
-  output$downloadData <- downloadHandler(
-    filename = function() {
-      paste0("mock_data-", Sys.Date(), ".csv")
-    },
-    content = function(file) {
-      write.csv(data, file)
-    }
-  )
-
-  flexdashboard::valueBox(value = downloadButton("downloadData", "Download Mock Data",
-                                                icon = shiny::icon("download")))
-})
+div(downloadButton("downloadData", "Download Mock Data",
+                   icon = shiny::icon("download"),
+                   style = "color: #fff; background-color: #5c0b55; border-color: #5c0b55"))
 
 renderImage({
-  pfad <- "one_logo.png"
+  pfad <- app_file("one_logo.png")
   list(
     src = pfad,
     contentType = 'image/png',
     width = 210,
     height = 60,
     style = "position: fixed; bottom: 10px; left: 10px; cursor: pointer;",
-    onclick = "window.location.href = 'http://onehealth.or.kr/    ';"
+    onclick = "window.location.href = 'http://onehealth.or.kr/';"
   )
 }, deleteFile = FALSE)
 
 output$download_manual <- downloadHandler(
   filename = "SEIRify_User_Manual.pdf",
   content = function(file) {
-    file.copy("SEIRify_User_Manual.pdf", file)
+    src <- app_file("SEIRify_User_Manual.pdf")
+    if (file.exists(src)) file.copy(src, file, overwrite = TRUE)
   }
 )
 
@@ -2567,19 +2245,69 @@ output$download_manual <- downloadHandler(
 output$R0_value <- renderText({
   if (input$model %in% c("SIR", "SEIR")) {
     req(input$beta, input$gamma)
-    round(input$beta / input$gamma, 2)
+    as.character(round(input$beta / input$gamma, 2))
+  } else {
+    ""
   }
+})
+
+output$obs_event_hint <- renderText({
+  req(input$model)
+  if (input$model == "SEIR") return("")
+  w <- if (is.null(input$obs_event) || input$obs_event == "default") {
+         if (input$model == "SI") "date_of_exposure" else "date_of_onset"
+       } else if (input$obs_event == "onset") "date_of_onset" else "date_of_exposure"
+  paste0("Observed curve is built from ", w,
+         ". SI and SIR disagree by default; set this to compare them on equal terms.")
+})
+
+output$N_real_hint <- renderUI({
+  df <- dataset()
+  grey <- "color: #c9c9c9;"
+  warn <- "color: #ffcf6b; font-weight: 600;"
+
+  if (is.null(df)) {
+    return(div(style = grey, "Upload a line list, then set the population the cases came from."))
+  }
+  if (is.null(input$N_real) || !is.finite(input$N_real)) {
+    return(div(style = warn,
+      paste0("Enter N to run. The file holds ", nrow(df),
+             " cases; N is the population they arose from.")))
+  }
+  if (input$N_real < nrow(df)) {
+    return(div(style = warn,
+      paste0("N must be at least ", nrow(df), " - the number of cases in the file.")))
+  }
+  if (isTRUE(input$N_real == nrow(df))) {
+    return(div(style = warn,
+      paste0("N is still the case count (", nrow(df),
+             "). That is a placeholder, not a population at risk - replace it with the ",
+             "population these cases arose from, or the simulated epidemic runs in a ",
+             "population the size of the case series.")))
+  }
+  div(style = grey,
+    paste0(format(round(input$N_real), big.mark = ","), " at risk, ", nrow(df),
+           " of them cases (attack rate ",
+           formatC(100 * nrow(df) / input$N_real, format = "f", digits = 2), "%)."))
 })
 
 ```
 
 
 ```{r app-observers}
-useShinyjs()
+# shinyjs renders its <script> and <link> tags into the HEAD slot, and a knitr
+# chunk in a flexdashboard only emits the BODY slot - so a plain useShinyjs()
+# call here is silently dropped and every shinyjs::disable()/enable() in the
+# app becomes a no-op. (That is why the previous version's "choose N >= cases"
+# guard never actually stopped anyone pressing Run.) Emitting the head markup
+# into the body instead gets the scripts onto the page; browsers execute
+# scripts in the body just the same.
+htmltools::HTML(htmltools::renderTags(shinyjs::useShinyjs())$head)
 
+# anything that invalidates the last run
 observeEvent(list(
-  input$model, input$N, input$days, input$simulation_only, input$custom_N, input$N_real,
-  input$beta, input$sigma, input$gamma,
+  input$model, input$N, input$days, input$simulation_only, input$N_real, input$extra_days,
+  input$beta, input$sigma, input$gamma, input$obs_event,
   input$initial_S_si, input$initial_I_si,
   input$initial_S_sir, input$initial_I_sir, input$initial_R_sir,
   input$initial_S_seir, input$initial_E_seir, input$initial_I_seir, input$initial_R_seir,
@@ -2588,242 +2316,224 @@ observeEvent(list(
   params_changed(TRUE)
 })
 
-observe({
-  req(input$model)
-  
-  current_N <- if (simulation_only()) {
-    input$N
-  } else {
-    if (!is.null(dataset()) && input$custom_N) {
-      input$N_real
-    } else if (!is.null(dataset())) {
-      nrow(dataset())
-    } else {
-      return()
-    }
-  }
-  
-  req(current_N, is.numeric(current_N))
-  
-  if (input$model == "SI") {
-    updateNumericInput(session, "initial_S_si", value = current_N - 1)
-    updateNumericInput(session, "initial_I_si", value = 1)
-  } else if (input$model == "SIR") {
-    updateNumericInput(session, "initial_S_sir", value = current_N - 1)
-    updateNumericInput(session, "initial_I_sir", value = 1)
-    updateNumericInput(session, "initial_R_sir", value = 0)
-  } else if (input$model == "SEIR") {
-    updateNumericInput(session, "initial_S_seir", value = current_N - 1)
-    updateNumericInput(session, "initial_E_seir", value = 0)
-    updateNumericInput(session, "initial_I_seir", value = 1)
-    updateNumericInput(session, "initial_R_seir", value = 0)
-  }
+# ---------------------------------------------------------------------------
+# helpers shared by the observers below
+# ---------------------------------------------------------------------------
+active_N <- reactive({
+  if (isTRUE(input$simulation_only)) input$N else input$N_real
 })
 
+current_init <- reactive({
+  switch(input$model,
+    "SI"   = list(S = input$initial_S_si,   I = input$initial_I_si),
+    "SIR"  = list(S = input$initial_S_sir,  I = input$initial_I_sir,  R = input$initial_R_sir),
+    "SEIR" = list(S = input$initial_S_seir, E = input$initial_E_seir,
+                  I = input$initial_I_seir, R = input$initial_R_seir))
+})
+
+push_init <- function(model_type, init) {
+  if (model_type == "SI") {
+    updateNumericInput(session, "initial_S_si", value = init$S)
+    updateNumericInput(session, "initial_I_si", value = init$I)
+  } else if (model_type == "SIR") {
+    updateNumericInput(session, "initial_S_sir", value = init$S)
+    updateNumericInput(session, "initial_I_sir", value = init$I)
+    updateNumericInput(session, "initial_R_sir", value = init$R)
+  } else {
+    updateNumericInput(session, "initial_S_seir", value = init$S)
+    updateNumericInput(session, "initial_E_seir", value = init$E)
+    updateNumericInput(session, "initial_I_seir", value = init$I)
+    updateNumericInput(session, "initial_R_seir", value = init$R)
+  }
+}
+
+# Suggested initial conditions.
+#  - simulated-only: the textbook seed, S = N - 1, I = 1
+#  - real vs simulated: read off the uploaded data on the first day of the
+#    window (who is already exposed / symptomatic / recovered), so the
+#    simulated epidemic starts from the same place the observed one does
+#    instead of always from a single infected individual.
+suggest_init <- function(model_type, N, df = NULL, gamma = NULL, extra_days = 0,
+                         event = "default") {
+  if (is.null(df)) {
+    return(switch(model_type,
+      "SI"   = list(S = N - 1, I = 1),
+      "SIR"  = list(S = N - 1, I = 1, R = 0),
+      "SEIR" = list(S = N - 1, E = 0, I = 1, R = 0)))
+  }
+  est <- tryCatch(estimate_initial_conditions(df, model_type, N, gamma, extra_days, event),
+                  error = function(e) NULL)
+  if (is.null(est)) {
+    return(switch(model_type,
+      "SI"   = list(S = N - 1, I = 1),
+      "SIR"  = list(S = N - 1, I = 1, R = 0),
+      "SEIR" = list(S = N - 1, E = 0, I = 1, R = 0)))
+  }
+  est[intersect(names(est), c("S", "E", "I", "R"))]
+}
+
+# refresh the suggested initial values whenever the things they depend on move
+# (not when the user edits the initial values themselves)
+observeEvent(list(input$model, active_N(), dataset(), input$simulation_only,
+                  input$gamma, input$extra_days, input$obs_event), {
+  req(input$model)
+  N <- active_N()
+  req(is.numeric(N), length(N) == 1, is.finite(N), N > 0)
+
+  df <- if (isTRUE(input$simulation_only)) NULL else dataset()
+  push_init(input$model, suggest_init(input$model, N, df, input$gamma,
+                                      input$extra_days %||% 0, input$obs_event %||% "default"))
+}, ignoreInit = FALSE)
+
+observeEvent(input$reset_initials, {
+  req(input$model)
+  N <- active_N(); req(is.finite(N), N > 0)
+  df <- if (isTRUE(input$simulation_only)) NULL else dataset()
+  push_init(input$model, suggest_init(input$model, N, df, input$gamma,
+                                      input$extra_days %||% 0, input$obs_event %||% "default"))
+  showNotification("Initial values reset to the suggested defaults.", type = "message", duration = 5)
+})
+
+# The upload pre-fills N with the case count so the box is never empty and the
+# model runs straight away, and says plainly that this is a placeholder. The
+# assumption is declared on every run rather than made silently: see the hint
+# under the field and the "Total population at risk" row of the Model
+# Parameters table.
+observeEvent(dataset(), {
+  df <- dataset()
+  req(df)
+  updateNumericInput(session, "N_real", value = nrow(df), min = 1)
+  showNotification(
+    paste0("Loaded ", nrow(df), " cases. 'Total Population at Risk (N)' has been pre-filled ",
+           "with ", nrow(df), ", which is only the number of cases, not a population at risk. ",
+           "You can run the model now, but replace N with the population these cases arose ",
+           "from before reading anything into the comparison."),
+    type = "warning", duration = 20, id = "need_n")
+})
+
+# the run stays blocked until N is present and large enough to hold the cases
 observe({
-  req(input$custom_N, input$N_real, !simulation_only(), dataset())
-  
-  req_n <- nrow(dataset()) + 1
-  current_n <- input$N_real
-  
-  if (current_n < req_n) {
+  if (isTRUE(input$simulation_only)) {
+    shinyjs::enable("run_model")
+    removeNotification("n_missing"); removeNotification("n_too_small")
+    return()
+  }
+
+  df <- dataset()
+  if (is.null(df)) { shinyjs::disable("run_model"); return() }
+
+  if (is.null(input$N_real) || !is.finite(input$N_real)) {
     shinyjs::disable("run_model")
+    removeNotification("n_too_small")
+    showNotification("Enter the total population at risk (N) to run the model.",
+                     type = "warning", duration = NULL, id = "n_missing")
+  } else if (input$N_real < nrow(df)) {   # N can never be smaller than the cases it must hold
+    shinyjs::disable("run_model")
+    removeNotification("n_missing")
     showNotification(
-      paste0("Your file contains ", nrow(dataset()), " cases; choose N ≥ ", req_n),
-      type = "error",
-      duration = 10
-    )
+      paste0("Your file contains ", nrow(df), " cases; N must be at least ", nrow(df), "."),
+      type = "error", duration = NULL, id = "n_too_small")
   } else {
     shinyjs::enable("run_model")
+    removeNotification("n_missing"); removeNotification("n_too_small")
+    removeNotification("need_n")
   }
 })
 
-observeEvent(dataset(), {
-  if (!is.null(dataset()) && !simulation_only()) {
-    updateSliderInput(session, "N_real", value = nrow(dataset()))
-  }
-})
-
+# ---------------------------------------------------------------------------
+# run
+# ---------------------------------------------------------------------------
 observeEvent(input$run_model, {
   withProgress(message = 'Running model...', value = 0, {
     params_changed(FALSE)
 
     tryCatch({
-      req(input$model)
-
+      req(input$model, input$beta)
       run_clicked(TRUE)
 
-      if (simulation_only()) {
-        req(input$N)
-        current_N <- input$N
-        N_override <- NULL
-      } else {
-        req(dataset())
-        if (input$custom_N) {
-          req(input$N_real)
-          current_N <- input$N_real
-          N_override <- current_N
-        } else {
-          current_N <- nrow(dataset())
-          N_override <- NULL
-        }
-      }
+      sim_only <- isTRUE(input$simulation_only)
+      model_type <- input$model
 
-      current_S <- if (input$model == "SI") input$initial_S_si else
-                  if (input$model == "SIR") input$initial_S_sir else
-                  input$initial_S_seir
+      if (model_type == "SEIR") req(input$sigma, input$gamma)
+      if (model_type == "SIR")  req(input$gamma)
 
-      current_I <- if (input$model == "SI") input$initial_I_si else
-                  if (input$model == "SIR") input$initial_I_sir else
-                  input$initial_I_seir
-
-      current_E <- if (input$model %in% c("SI", "SIR")) 0 else input$initial_E_seir
-      current_R <- if (input$model == "SI") 0 else
-                  if (input$model == "SIR") input$initial_R_sir else
-                  input$initial_R_seir
-
-      sum_compartments <- current_S + current_I + current_E + current_R
-
-      if (sum_compartments != current_N) {
+      current_N <- active_N()
+      if (is.null(current_N) || !is.numeric(current_N) || !is.finite(current_N) || current_N <= 0) {
         showNotification(
-          paste("Error: Initial compartments must sum to N (", current_N,
-                "). Current sum: ", sum_compartments,
-                ". Resetting to defaults (i.e. S = N - 1, I = 1 , E = 0, R = 0)."),
-          type = "error",
-          duration = 10
-        )
-
-        if (input$model == "SI") {
-          updateNumericInput(session, "initial_S_si", value = current_N - 1)
-          updateNumericInput(session, "initial_I_si", value = 1)
-        } else if (input$model == "SIR") {
-          updateNumericInput(session, "initial_S_sir", value = current_N - 1)
-          updateNumericInput(session, "initial_I_sir", value = 1)
-          updateNumericInput(session, "initial_R_sir", value = 0)
-        } else if (input$model == "SEIR") {
-          updateNumericInput(session, "initial_S_seir", value = current_N - 1)
-          updateNumericInput(session, "initial_E_seir", value = 0)
-          updateNumericInput(session, "initial_I_seir", value = 1)
-          updateNumericInput(session, "initial_R_seir", value = 0)
-        }
-        
+          if (sim_only) "Enter the total population (N) before running the model."
+          else paste0("Enter the total population at risk (N) before running the model. ",
+                      "It is the population the uploaded cases arose from, not the number of cases."),
+          type = "error", duration = 12)
+        return()
+      }
+      if (!sim_only && !is.null(dataset()) && current_N < nrow(dataset())) {
+        showNotification(
+          paste0("N must be at least ", nrow(dataset()), " - the number of cases in the file."),
+          type = "error", duration = 12)
         return()
       }
 
-      shinyjs::removeClass(id = if (input$model == "SI") "initial_S_si" else
-                          if (input$model == "SIR") "initial_S_sir" else "initial_S_seir",
-                          class = "error-highlight")
-      shinyjs::removeClass(id = if (input$model == "SI") "initial_I_si" else
-                          if (input$model == "SIR") "initial_I_sir" else "initial_I_seir",
-                          class = "error-highlight")
-      if (input$model == "SIR") {
-        shinyjs::removeClass("initial_R_sir", "error-highlight")
-      } else if (input$model == "SEIR") {
-        shinyjs::removeClass("initial_E_seir", "error-highlight")
-        shinyjs::removeClass("initial_R_seir", "error-highlight")
+      init <- lapply(current_init(), function(v) if (is.null(v) || !is.finite(v)) 0 else as.numeric(v))
+
+      sum_compartments <- sum(unlist(init))
+      if (abs(sum_compartments - current_N) > 1e-6) {
+        showNotification(
+          paste0("Initial compartments must sum to N (", current_N, "). Current sum: ",
+                 sum_compartments, ". They have been reset to the suggested values - ",
+                 "press Run Model Simulation again."),
+          type = "error", duration = 12)
+        df0 <- if (sim_only) NULL else dataset()
+        push_init(model_type, suggest_init(model_type, current_N, df0, input$gamma,
+                                           input$extra_days %||% 0, input$obs_event %||% "default"))
+        return()
       }
 
-      req(input$beta)
+      incProgress(0.4, detail = "Computing model...")
 
-      if (simulation_only()) {
+      if (sim_only) {
         req(input$days)
-      }
-
-      if (input$model == "SEIR") {
-        req(input$sigma, input$gamma)
-      }
-
-      if (input$model == "SIR") {
-        req(input$gamma)
-      }
-
-      incProgress(0.3, detail = "Computing model...")
-
-      if (simulation_only()) {
-        if (input$model == "SI") {
-          results <- run_si_model(current_N, input$beta, input$days,
-                                current_S, current_I)
-        } else if (input$model == "SIR") {
-          results <- run_sir_model(current_N, input$beta, input$gamma, input$days,
-                                 current_S, current_I, current_R)
-        } else if (input$model == "SEIR") {
-          results <- run_seir_model(current_N, input$beta, input$sigma, input$gamma, input$days,
-                                  current_S, current_E, current_I, current_R)
-        }
-        bootstrap_results(NULL)
-        real_data_ci(NULL)
+        results <- run_model(model_type, N = current_N, beta = input$beta,
+                             sigma = if (model_type == "SEIR") input$sigma else NULL,
+                             gamma = if (model_type %in% c("SIR", "SEIR")) input$gamma else NULL,
+                             days = input$days, init = init)
+        ctx <- list(model_type = model_type, N = current_N, beta = input$beta,
+                    sigma = if (model_type == "SEIR") input$sigma else NULL,
+                    gamma = if (model_type %in% c("SIR", "SEIR")) input$gamma else NULL,
+                    days = input$days, init = init,
+                    start_date = min(results$Date), dataset = NULL,
+                    simulation_only = TRUE, extra_days = 0, event = "default")
       } else {
         req(dataset())
         df <- dataset()
+        extra <- max(0, input$extra_days %||% 0)
 
-        if (input$model == "SI") {
-          results <- run_real_model(df, "SI", input$beta, N_override = N_override)
-        } else if (input$model == "SIR") {
-          results <- run_real_model(df, "SIR", input$beta, gamma = input$gamma, N_override = N_override)
-        } else if (input$model == "SEIR") {
-          results <- run_real_model(df, "SEIR", input$beta, input$sigma, input$gamma, N_override = N_override)
-        }
-        
-        incProgress(0.3, detail = "Computing confidence intervals...")
-
-        tryCatch({
-          if (input$model == "SI") {
-            bootstrap_ci <- run_bayesian_bootstrap_ci(df, "SI", input$beta, 
-                                                     sigma = NULL, 
-                                                     gamma = NULL,
-                                                     n_boot = 10,
-                                                     N_override = N_override)
-          } else if (input$model == "SIR") {
-            bootstrap_ci <- run_bayesian_bootstrap_ci(df, "SIR", input$beta, 
-                                                     sigma = NULL,
-                                                     gamma = input$gamma,
-                                                     n_boot = 10,
-                                                     N_override = N_override)
-          } else if (input$model == "SEIR") {
-            bootstrap_ci <- run_bayesian_bootstrap_ci(df, "SEIR", input$beta, 
-                                                     sigma = input$sigma,
-                                                     gamma = input$gamma,
-                                                     n_boot = 10,
-                                                     N_override = N_override)
-          }
-          bootstrap_results(bootstrap_ci)
-        }, error = function(e) {
-          showNotification(
-            paste("Error running Bayesian bootstrap for simulated data: ", e$message),
-            type = "warning",
-            duration = 10
-          )
-          bootstrap_results(NULL)
-        })
-        
-        tryCatch({
-          if (input$model == "SI") {
-            real_ci <- run_real_data_ci(df, input$model, n_boot = 10, N_override = N_override)
-          } else {
-            real_ci <- run_real_data_ci(df, input$model, n_boot = 10, N_override = N_override, gamma = input$gamma)
-          }
-          if (!is.null(real_ci)) {
-            real_data_ci(real_ci)
-          } else {
-            real_data_ci(NULL)
-            showNotification("Could not generate confidence intervals for real data. Check if your dataset has valid date columns.", type = "warning", duration = 10)
-          }
-        }, error = function(e) {
-          real_data_ci(NULL)
-          showNotification(paste("Error generating real data CI:", e$message), type = "warning", duration = 10)
-        })
+        obs_event <- input$obs_event %||% "default"
+        results <- run_real_model(df, model_type, input$beta,
+                                  sigma = if (model_type == "SEIR") input$sigma else NULL,
+                                  gamma = if (model_type %in% c("SIR", "SEIR")) input$gamma else NULL,
+                                  N = current_N, init = init, extra_days = extra,
+                                  event = obs_event)
+        win <- attr(results, "window")
+        ctx <- list(model_type = model_type, N = current_N, beta = input$beta,
+                    sigma = if (model_type == "SEIR") input$sigma else NULL,
+                    gamma = if (model_type %in% c("SIR", "SEIR")) input$gamma else NULL,
+                    days = length(win$dates) - 1, init = init,
+                    start_date = win$start_date, dataset = df,
+                    simulation_only = FALSE, extra_days = extra, event = obs_event)
       }
+
+      incProgress(0.4, detail = "Finishing...")
 
       if (!is.null(results)) {
         model_results(results)
-        current_model(input$model)
+        current_model(model_type)
+        simulation_only(sim_only)
+        run_context(ctx)
       }
     }, error = function(e) {
       showNotification(
-        paste("Error running model: Confirm that all parameters are properly set", e$message),
-        type = "error",
-        duration = 10
-      )
+        paste("Error running model: Confirm that all parameters are properly set.", e$message),
+        type = "error", duration = 10)
     })
   })
 })
@@ -2832,10 +2542,15 @@ observeEvent(input$simulation_only, {
   previous_mode(simulation_only())
   simulation_only(input$simulation_only)
   run_clicked(FALSE)
-  bootstrap_results(NULL)
+  run_context(NULL)
+  model_results(NULL)
   if (!input$simulation_only && is.null(input$file1)) {
     showNotification("Please upload a dataset when comparing with real data", type = "message", duration = 10)
   }
+})
+
+observeEvent(input$separate_plots, {
+  separate_plots(input$separate_plots)
 })
 
 ```
@@ -2868,33 +2583,51 @@ Row {.tabset .tabset-fade data-height=550}
 
 ```{r render-model-viz}
 
-model_results <- reactiveVal(NULL)
-current_model <- reactiveVal(NULL)
-separate_plots <- reactiveVal(FALSE)
-simulation_only <- reactiveVal(TRUE)
+# NOTE: model_results / current_model / simulation_only / separate_plots are
+# created once in the setup chunk. They used to be re-created here, which left
+# two sets of reactive values in play and made the state depend on chunk order.
 
-# initialize with proper values
-observe({
-  separate_plots(isolate(input$separate_plots))
-  simulation_only(isolate(input$simulation_only))
-})
-
-# New: Reactive for CI settings
 ci_settings <- reactive({
   list(
-    ci_95 = input$ci_95,
-    ci_90 = input$ci_90,
-    ci_75 = input$ci_75,
-    ci_50 = input$ci_50
+    ci_95 = isTRUE(input$ci_95),
+    ci_90 = isTRUE(input$ci_90),
+    ci_75 = isTRUE(input$ci_75),
+    ci_50 = isTRUE(input$ci_50)
   )
+})
+
+any_ci_on <- reactive(any(unlist(ci_settings())))
+
+# Confidence bands for the simulated scenario, in BOTH modules. Computed from
+# the stored run context, so changing the CI level or the parameter CV does not
+# require re-running the model - and nothing is computed until a band is asked
+# for.
+simulated_ci_r <- reactive({
+  ctx <- run_context()
+  req(ctx, any_ci_on())
+
+  withProgress(message = "Computing confidence intervals...", value = 0.5, {
+    tryCatch(
+      simulate_ci(ctx$model_type, N = ctx$N, beta = ctx$beta,
+                  sigma = ctx$sigma, gamma = ctx$gamma,
+                  days = ctx$days, init = ctx$init, start_date = ctx$start_date,
+                  n_draws = CI_N_DRAWS,
+                  param_cv = input$param_cv %||% 0.10,
+                  dataset = ctx$dataset),
+      error = function(e) {
+        showNotification(paste("Could not compute confidence intervals:", e$message),
+                         type = "warning", duration = 10)
+        NULL
+      })
+  })
 })
 
 # render combined plot
 output$model_viz <- renderHighchart({
   req(model_results(), current_model(), !params_changed())
-  
+
   results <- model_results()
-  
+
   if (current_model() == "SI") {
     si_viz(results, separate = FALSE, simulation_only = simulation_only())
   } else if (current_model() == "SIR") {
@@ -2904,60 +2637,49 @@ output$model_viz <- renderHighchart({
   }
 })
 
-
 output$compartment_plot <- renderHighchart({
   req(model_results(), current_model(), input$separate_plots, input$compartment, !params_changed())
-  
-  results <- model_results()
-  
+
   compartment_viz(
-    results = results,
+    results = model_results(),
     compartment = input$compartment,
     simulation_only = simulation_only(),
-    bootstrap_ci = if (!simulation_only()) bootstrap_results() else NULL,
-    real_data_ci = if (!simulation_only()) real_data_ci() else NULL,
+    sim_ci = if (any_ci_on()) simulated_ci_r() else NULL,
     show_ci = ci_settings()
   )
-})
-
-# update separate_plots reactive value without recomputing model
-observeEvent(input$separate_plots, {
-  if (!is.null(model_results()) && !is.null(current_model()) && current_model() == input$model) {
-    separate_plots(input$separate_plots)
-  }
 })
 
 # renderUI
 renderUI({
   # Check if mode has changed by comparing current and previous simulation_only state
   mode_changed <- !is.null(previous_mode()) && previous_mode() != simulation_only()
-  
+
   if (is.null(model_results()) || is.null(current_model()) || !run_clicked()) {
     if (mode_changed) {
       if (simulation_only()) {
         return(div(
           p("Welcome to Simulated Only mode! Adjust parameters and click 'Run Model Simulation' to visualize results.",
-            style = "font-family: 'Tw Cen MT'; font-size: 18px; text-align: center;")
+            style = "font-family: 'Tw Cen MT', 'Century Gothic', 'Trebuchet MS', Arial, sans-serif; font-size: 18px; text-align: center;")
         ))
       } else {
         return(div(
-          p("Welcome to Real vs Simulated mode! Upload a dataset, adjust parameters, and click 'Run Model Simulation' to compare results.",
-            style = "font-family: 'Tw Cen MT'; font-size: 18px; text-align: center;")
+          p("Welcome to Real vs Simulated mode! Upload a dataset, set the population at risk, adjust parameters, and click 'Run Model Simulation' to compare results.",
+            style = "font-family: 'Tw Cen MT', 'Century Gothic', 'Trebuchet MS', Arial, sans-serif; font-size: 18px; text-align: center;")
         ))
       }
     } else {
       return(div(
         p("Welcome to SEIRify! Choose 'Simulated Scenario Only' mode (toggle on) or 'Real vs. Simulated' mode (toggle off, upload a dataset). Pick a model, set parameters, and click 'Run Model Simulation' to see results.",
-          style = "font-family: 'Tw Cen MT'; font-size: 18px; text-align: center;")
+          style = "font-family: 'Tw Cen MT', 'Century Gothic', 'Trebuchet MS', Arial, sans-serif; font-size: 18px; text-align: center;")
       ))
     }
   } else if (params_changed()) {
     return(div(
       p("Parameters updated. Click 'Run Model Simulation' to view new results.",
-        style = "font-family: 'Tw Cen MT'; font-size: 18px; text-align: center;")
+        style = "font-family: 'Tw Cen MT', 'Century Gothic', 'Trebuchet MS', Arial, sans-serif; font-size: 18px; text-align: center;")
     ))
   }
-  
+
   if (input$separate_plots) {
     div(
       style = "height: 450px; width: 100%;",
@@ -2978,42 +2700,25 @@ Row {.tabset .tabset-fade data-height=350}
 ```{r render-params-table}
 
 output$params_table <- renderDT({
-  req(run_clicked(), model_results(), current_model(), !params_changed())
-  
-  results <- model_results()
-  
-  if (simulation_only()) {
-    if (current_model() == "SI") {
-      si_params_table(input$N, input$beta, input$days, results)
-    } else if (current_model() == "SIR") {
-      sir_params_table(input$N, input$beta, input$gamma, input$days, results)
-    } else if (current_model() == "SEIR") {
-      seir_params_table(input$N, input$beta, input$sigma, input$gamma, input$days, results)
-    }
-  } else {
-    req(dataset())
-    df <- dataset()
-    
-    # Get N value for real data mode
-    N_val <- if (input$custom_N) input$N_real else NULL
-    
-    if (current_model() == "SI") {
-      real_si_params_table(df, input$beta, results, N_override = N_val)
-    } else if (current_model() == "SIR") {
-      real_sir_params_table(df, input$beta, input$gamma, results, N_override = N_val)
-    } else if (current_model() == "SEIR") {
-      real_seir_params_table(df, input$beta, input$sigma, input$gamma, results, N_override = N_val)
-    }
-  }
+  req(run_clicked(), model_results(), current_model(), run_context(), !params_changed())
+
+  ctx <- run_context()
+  custom_datatable(params_table_data(
+    model_type = ctx$model_type,
+    N = ctx$N, beta = ctx$beta, sigma = ctx$sigma, gamma = ctx$gamma,
+    results = model_results(), init = ctx$init,
+    simulation_only = ctx$simulation_only, dataset = ctx$dataset,
+    event = ctx$event %||% "default"
+  ))
 })
 
 renderUI({
   if (!run_clicked()) {
     p("...",
-      style = "font-family: 'Tw Cen MT'; font-size: 18px; text-align: center;")
+      style = "font-family: 'Tw Cen MT', 'Century Gothic', 'Trebuchet MS', Arial, sans-serif; font-size: 18px; text-align: center;")
   } else if (params_changed()) {
     p("Parameters updated. Click 'Run Model Simulation' to view new results.",
-      style = "font-family: 'Tw Cen MT'; font-size: 18px; text-align: center;")
+      style = "font-family: 'Tw Cen MT', 'Century Gothic', 'Trebuchet MS', Arial, sans-serif; font-size: 18px; text-align: center;")
   } else {
     DTOutput("params_table")
   }
@@ -3026,31 +2731,37 @@ renderUI({
 ```{r render-comparison-table}
 
 output$comparison_table <- renderDT({
-  req(run_clicked(), model_results(), current_model(), dataset(), !simulation_only(), !params_changed())
-  
-  df <- dataset()
-  
-  if (current_model() == "SI") {
-    comp <- bootstrap_comparison(df, "SI", input$beta, n_boot = 10)
-  } else if (current_model() == "SIR") {
-    comp <- bootstrap_comparison(df, "SIR", input$beta, gamma = input$gamma, n_boot = 10)
-  } else if (current_model() == "SEIR") {
-    comp <- bootstrap_comparison(df, "SEIR", input$beta, input$sigma, input$gamma, n_boot = 10)
-  }
-  
+  req(run_clicked(), model_results(), current_model(), run_context(), !params_changed())
+  ctx <- run_context()
+  req(!ctx$simulation_only, !is.null(ctx$dataset))
+
+  withProgress(message = "Comparing simulated and observed...", value = 0.5, {
+    comp <- comparison_table_data(
+      dataset = ctx$dataset, model_type = ctx$model_type,
+      beta = ctx$beta, sigma = ctx$sigma, gamma = ctx$gamma,
+      N = ctx$N, init = ctx$init, extra_days = ctx$extra_days,
+      n_draws = CI_N_DRAWS, param_cv = input$param_cv %||% 0.10,
+      event = ctx$event %||% "default")
+  })
+
   datatable(
     comp,
     rownames = FALSE,
+    extensions = 'Buttons',
     options = list(
       dom = 'Brt',
       buttons = c('csv','excel', 'pdf'),
-      pageLength = nrow(comp)
+      pageLength = nrow(comp),
+      paging = FALSE,
+      scrollY = "230px",
+      scrollCollapse = TRUE,
+      columnDefs = list(list(className = 'dt-right', targets = c(2, 3, 5)))
     )
   ) %>%
     formatStyle(
       columns = 1:ncol(comp),
       fontSize = '14px',
-      fontFamily = 'Tw Cen MT'
+      fontFamily = APP_FONT
     ) %>%
     formatStyle(
       columns = 1:ncol(comp),
@@ -3064,22 +2775,27 @@ output$comparison_table <- renderDT({
     formatStyle(
       'Metric',
       fontWeight = 'bold'
-    ) %>%
-    formatRound(columns = c("Estimate", "Lower_CI", "Upper_CI"), digits = 0)
+    )
 })
 
 renderUI({
   if (!run_clicked()) {
     p("...",
-      style = "font-family: 'Tw Cen MT'; font-size: 18px; text-align: center;")
+      style = "font-family: 'Tw Cen MT', 'Century Gothic', 'Trebuchet MS', Arial, sans-serif; font-size: 18px; text-align: center;")
   } else if (params_changed()) {
     p("Parameters updated. Click 'Run Model Simulation' to view new results.",
-      style = "font-family: 'Tw Cen MT'; font-size: 18px; text-align: center;")
+      style = "font-family: 'Tw Cen MT', 'Century Gothic', 'Trebuchet MS', Arial, sans-serif; font-size: 18px; text-align: center;")
   } else if (simulation_only()) {
     p("Comparison metrics are only available when comparing simulated and real scenarios.",
-      style = "font-family: 'Tw Cen MT'; font-size: 18px; text-align: center;")
+      style = "font-family: 'Tw Cen MT', 'Century Gothic', 'Trebuchet MS', Arial, sans-serif; font-size: 18px; text-align: center;")
   } else {
-    DTOutput("comparison_table")
+    tagList(
+      div(style = "font-size: 12px; padding: 6px 10px; color: #555;",
+          "Observed values are counts from the uploaded line list and carry no interval. ",
+          "The simulated column is the run shown in the chart, with a 95% interval from ",
+          CI_N_DRAWS, " parameter draws. Difference = Observed - Simulated."),
+      DTOutput("comparison_table")
+    )
   }
 })
 
@@ -3098,7 +2814,7 @@ output$demographic_tables <- renderUI({
   tables <- lapply(input$demo_vars, function(var) {
     summary_df <- create_demographic_summary(df, var)
     tagList(
-      h4(toupper(var), style = "font-family: 'Tw Cen MT'; fontWeight: bold;"),
+      h4(toupper(var), style = "font-family: 'Tw Cen MT', 'Century Gothic', 'Trebuchet MS', Arial, sans-serif; fontWeight: bold;"),
       render_demographic_table(summary_df),
       br()
     )
@@ -3112,10 +2828,10 @@ renderUI({
     uiOutput("demographic_tables")
   } else if (input$demographics && simulation_only()) {
     p("Demographics are only available when using real data.",
-      style = "font-family: 'Tw Cen MT'; font-size: 18px; text-align: center;")
+      style = "font-family: 'Tw Cen MT', 'Century Gothic', 'Trebuchet MS', Arial, sans-serif; font-size: 18px; text-align: center;")
   } else {
     p("Demographics analysis is turned off. Toggle the switch in the sidebar to enable.", 
-      style = "font-family: 'Tw Cen MT'; font-size: 18px; text-align: center;")
+      style = "font-family: 'Tw Cen MT', 'Century Gothic', 'Trebuchet MS', Arial, sans-serif; font-size: 18px; text-align: center;")
   }
 })
 
